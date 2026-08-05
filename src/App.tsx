@@ -38,7 +38,7 @@ export function AppContent() {
 
   // Role permissions map
   const allowedTabs: { [role: string]: NavTab[] } = {
-    saas_admin: ['saas_admin', 'dashboard', 'ingredients', 'purchases', 'recipes', 'production', 'pos', 'reports', 'settings'],
+    saas_admin: ['saas_admin', 'dashboard', 'settings'],
     owner: ['dashboard', 'ingredients', 'purchases', 'recipes', 'production', 'pos', 'reports', 'settings'],
     manager: ['ingredients', 'purchases', 'recipes', 'production'],
     cashier: ['pos']
@@ -68,10 +68,15 @@ export function AppContent() {
   const handleLoginSuccess = (role: UserRole) => {
     setCurrentRole(role);
     setViewMode('app');
-    if (role === 'cashier') setActiveTab('pos');
-    else if (role === 'manager') setActiveTab('recipes');
-    else if (role === 'saas_admin') setActiveTab('saas_admin');
-    else setActiveTab('dashboard');
+    if (role === 'saas_admin') {
+      setActiveTab('saas_admin');
+    } else if (role === 'cashier') {
+      setActiveTab('pos');
+    } else if (role === 'manager') {
+      setActiveTab('recipes');
+    } else {
+      setActiveTab('dashboard');
+    }
   };
 
   const handleLogout = () => {
@@ -110,7 +115,7 @@ export function AppContent() {
       />
 
       <main className="main-content">
-        {activeTab === 'saas_admin' && (currentRole === 'saas_admin' || currentRole === 'owner') && <SaasAdminView />}
+        {activeTab === 'saas_admin' && currentRole === 'saas_admin' && <SaasAdminView />}
         {activeTab === 'dashboard' && hasTabAccess(currentRole, 'dashboard') && <DashboardView setActiveTab={setActiveTab} />}
         {activeTab === 'ingredients' && hasTabAccess(currentRole, 'ingredients') && <IngredientsView />}
         {activeTab === 'purchases' && hasTabAccess(currentRole, 'purchases') && <PurchasesView />}

@@ -144,6 +144,22 @@ const STORAGE_KEYS = {
   SALES: 'mavin_sales'
 };
 
+// One-time migration: clear stale dummy data from previous versions
+// This ensures only REAL data (from APK registration) populates the cloud
+const SYNC_VERSION_KEY = 'mavin_sync_version';
+const CURRENT_SYNC_VERSION = '6'; // Increment this to force a re-clean
+
+(function runMigration() {
+  const currentVer = localStorage.getItem(SYNC_VERSION_KEY);
+  if (currentVer !== CURRENT_SYNC_VERSION) {
+    // Clear old tenant and user data that may contain dummy entries
+    localStorage.removeItem('mavin_tenants_v5');
+    localStorage.removeItem('mavin_registered_users');
+    localStorage.setItem(SYNC_VERSION_KEY, CURRENT_SYNC_VERSION);
+    console.log('[MAVIN] Migration v' + CURRENT_SYNC_VERSION + ': cleared stale local data');
+  }
+})();
+
 function getInitialTenantsList(): TenantAccount[] {
   const savedTenantsStr = localStorage.getItem('mavin_tenants_v5');
   return savedTenantsStr ? JSON.parse(savedTenantsStr) : [];

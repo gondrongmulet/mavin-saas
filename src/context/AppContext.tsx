@@ -121,6 +121,7 @@ interface AppContextType {
 
   // Utilities
   resetToSampleData: () => void;
+  clearStoreDataForNewTenant: () => void;
   exportDataJson: () => void;
   importDataJson: (jsonString: string) => boolean;
 }
@@ -531,6 +532,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const clearStoreDataForNewTenant = () => {
+    setIngredients([]);
+    setRecipes([]);
+    setPurchases([]);
+    setProductions([]);
+    setSales([]);
+    localStorage.removeItem(STORAGE_KEYS.INGREDIENTS);
+    localStorage.removeItem(STORAGE_KEYS.RECIPES);
+    localStorage.removeItem(STORAGE_KEYS.PURCHASES);
+    localStorage.removeItem(STORAGE_KEYS.PRODUCTIONS);
+    localStorage.removeItem(STORAGE_KEYS.SALES);
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -571,6 +585,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         executeProductionBatch,
         addSaleTransaction,
         resetToSampleData,
+        clearStoreDataForNewTenant,
         exportDataJson,
         importDataJson
       }}

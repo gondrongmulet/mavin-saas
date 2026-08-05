@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { DashboardView } from './components/DashboardView';
@@ -16,17 +16,10 @@ import { UserRole } from './types';
 import { Lock, Award, ShieldAlert, ArrowRight } from 'lucide-react';
 
 export function AppContent() {
-  const [viewMode, setViewMode] = useState<'landing' | 'app'>('landing');
-  const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-
   // Strict Authentication Guard State
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
     return localStorage.getItem('mavin_is_logged_in') === 'true';
   });
-
-  const { currentRole, setCurrentRole, hasTabAccess, storeSettings } = useApp();
 
   // Detect Capacitor Native Android Platform
   const isNativeApk =
@@ -34,12 +27,28 @@ export function AppContent() {
     Boolean((window as any).Capacitor?.getPlatform?.() === 'android') ||
     Boolean((window as any).Capacitor?.platform === 'android');
 
+  // Preserve session on page refresh (don't log out or return to landing page on refresh!)
+  const [viewMode, setViewMode] = useState<'landing' | 'app'>(() => {
+    if (isNativeApk || localStorage.getItem('mavin_is_logged_in') === 'true') {
+      return 'app';
+    }
+    return 'landing';
+  });
+
+  const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+
+  const { currentRole, setCurrentRole, hasTabAccess, storeSettings } = useApp();
+
   useEffect(() => {
     if (isNativeApk) {
       setViewMode('app');
       if (!isLoggedIn) {
         setIsAuthOpen(true);
       }
+    } else if (isLoggedIn) {
+      setViewMode('app');
     }
   }, [isNativeApk, isLoggedIn]);
 
@@ -104,7 +113,7 @@ export function AppContent() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     setIsLoggedIn(false);
     localStorage.removeItem('mavin_is_logged_in');
     setCurrentRole('owner');
@@ -116,10 +125,40 @@ export function AppContent() {
       setViewMode('landing');
       setIsAuthOpen(false);
     }
-  };
+  }, [isNativeApk, setCurrentRole]);
 
-  // 1. Landing Page View (Web Only)
-  if (viewMode === 'landing' && !isNativeApk) {
+  // -----------------------------------------------------------------
+  // ⏱️ 5-MINUTE INACTIVITY AUTO LOGOUT TIMER
+  // -----------------------------------------------------------------
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    let inactivityTimer: ReturnType<typeof setTimeout>;
+    const INACTIVITY_LIMIT_MS = 5 * 60 * 1000; // 5 minutes (300,000 ms)
+
+    const resetInactivityTimer = () => {
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => {
+        alert('🔒 Sesi Anda telah berakhir karena tidak ada aktivitas selama 5 menit. Silakan login kembali untuk melanjutkan.');
+        handleLogout();
+      }, INACTIVITY_LIMIT_MS);
+    };
+
+    // User activity listeners
+    const activityEvents = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
+    activityEvents.forEach(event => window.addEventListener(event, resetInactivityTimer));
+
+    // Initialize timer on mount or login
+    resetInactivityTimer();
+
+    return () => {
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      activityEvents.forEach(event => window.removeEventListener(event, resetInactivityTimer));
+    };
+  }, [isLoggedIn, handleLogout]);
+
+  // 1. Landing Page View (Web Only when NOT Logged In)
+  if (viewMode === 'landing' && !isNativeApk && !isLoggedIn) {
     return (
       <>
         <LandingPageView
@@ -214,7 +253,7 @@ export function AppContent() {
     );
   }
 
-  // 3. AUTHENTICATED APP WORKSPACE
+  // 3. AUTHENTICATED APP WORKSPACE (Preserved on Refresh!)
   return (
     <div className="app-container">
       <Sidebar

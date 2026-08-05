@@ -31,7 +31,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onLoginSuccess,
   allowClose = true
 }) => {
-  const { setCurrentRole, storeSettings, updateStoreSettings, staffUsers, tenantAccounts, addStaffUser } = useApp();
+  const { setCurrentRole, storeSettings, updateStoreSettings, staffUsers, tenantAccounts, addStaffUser, clearStoreDataForNewTenant } = useApp();
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
 
   // Form Inputs
@@ -111,6 +111,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       localStorage.setItem('mavin_registered_users', JSON.stringify(registeredUsers));
 
       updateStoreSettings({ storeName: newStore.storeName });
+      clearStoreDataForNewTenant();
 
       addStaffUser({
         name: ownerNameInput || 'Pemilik Toko',

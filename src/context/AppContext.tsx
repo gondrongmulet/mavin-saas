@@ -145,10 +145,10 @@ const STORAGE_KEYS = {
 };
 
 const DEFAULT_INITIAL_TENANT: TenantAccount = {
-  id: 'TNT-ALVINA-001',
-  storeName: 'Toko Ibu Alvina',
+  id: 'TNT-001',
+  storeName: 'Toko Ibu Alvina (Sample)',
   ownerName: 'Ibu Alvina',
-  email: 'alvina@mavin.id',
+  email: 'pemilik@tokoalvina.id',
   phone: '081234567890',
   plan: 'Pro',
   status: 'Aktif',
@@ -163,11 +163,6 @@ function getInitialTenantsList(): TenantAccount[] {
   const registeredUsersStr = localStorage.getItem('mavin_registered_users');
   
   let list: TenantAccount[] = savedTenantsStr ? JSON.parse(savedTenantsStr) : [];
-
-  // Guarantee Toko Ibu Alvina is included
-  if (!list.some(t => t.ownerName?.toLowerCase().includes('alvina') || t.email?.toLowerCase().includes('alvina'))) {
-    list.unshift(DEFAULT_INITIAL_TENANT);
-  }
 
   if (registeredUsersStr) {
     try {
@@ -190,6 +185,10 @@ function getInitialTenantsList(): TenantAccount[] {
         }
       });
     } catch (e) {}
+  }
+
+  if (list.length === 0) {
+    list = [DEFAULT_INITIAL_TENANT];
   }
 
   localStorage.setItem('mavin_tenants_v5', JSON.stringify(list));

@@ -30,10 +30,10 @@ interface NavigationProps {
   activeTab: NavTab;
   setActiveTab: (tab: NavTab) => void;
   onOpenLanding?: () => void;
-  onOpenAuth?: () => void;
+  onLogout?: () => void;
 }
 
-export const Sidebar: React.FC<NavigationProps> = ({ activeTab, setActiveTab, onOpenLanding, onOpenAuth }) => {
+export const Sidebar: React.FC<NavigationProps> = ({ activeTab, setActiveTab, onOpenLanding, onLogout }) => {
   const { ingredients, resetToSampleData, exportDataJson, currentRole, setCurrentRole, storeSettings, hasTabAccess } = useApp();
 
   const lowStockCount = ingredients.filter(i => i.stock <= i.minStock).length;
@@ -244,6 +244,16 @@ export const Sidebar: React.FC<NavigationProps> = ({ activeTab, setActiveTab, on
               style={{ width: '100%', fontSize: '0.8rem', padding: '0.4rem', color: 'var(--primary)', borderColor: 'var(--border-color-focus)' }}
             >
               <Globe size={14} /> Lihat Landing Page SaaS
+            </button>
+          )}
+
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="btn btn-outline"
+              style={{ width: '100%', fontSize: '0.8rem', padding: '0.4rem', color: 'var(--accent-rose)', borderColor: '#fca5a5' }}
+            >
+              <LogOut size={14} /> Keluar (Logout)
             </button>
           )}
 

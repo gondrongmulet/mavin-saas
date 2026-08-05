@@ -15,7 +15,8 @@ import { AuthModal } from './components/AuthModal';
 import { UserRole } from './types';
 
 export function AppContent() {
-  const [viewMode, setViewMode] = useState<'app' | 'landing'>('app');
+  // Public visitors default to the Landing Page!
+  const [viewMode, setViewMode] = useState<'landing' | 'app'>('landing');
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -72,6 +73,12 @@ export function AppContent() {
     else setActiveTab('dashboard');
   };
 
+  const handleLogout = () => {
+    // Return to public Landing Page upon logout
+    setViewMode('landing');
+    setIsAuthOpen(false);
+  };
+
   if (viewMode === 'landing') {
     return (
       <>
@@ -98,7 +105,7 @@ export function AppContent() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenLanding={() => setViewMode('landing')}
-        onOpenAuth={() => handleOpenAuth('login')}
+        onLogout={handleLogout}
       />
 
       <main className="main-content">

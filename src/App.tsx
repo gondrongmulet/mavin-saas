@@ -15,13 +15,26 @@ import { AuthModal } from './components/AuthModal';
 import { UserRole } from './types';
 
 export function AppContent() {
-  // Public visitors default to the Landing Page!
+  // Public visitors default to the Landing Page on web, but Native Android APK bypasses Landing Page!
   const [viewMode, setViewMode] = useState<'landing' | 'app'>('landing');
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
   const { currentRole, setCurrentRole, hasTabAccess, storeSettings } = useApp();
+
+  // Detect Capacitor Native Android Platform: Bypass Landing Page on APK & Open Login Modal directly!
+  useEffect(() => {
+    const isNativeApk =
+      Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
+      Boolean((window as any).Capacitor?.getPlatform?.() === 'android') ||
+      Boolean((window as any).Capacitor?.platform === 'android');
+
+    if (isNativeApk) {
+      setViewMode('app');
+      setIsAuthOpen(true);
+    }
+  }, []);
 
   // Dynamically update primary color and background theme CSS variables!
   useEffect(() => {
@@ -80,10 +93,20 @@ export function AppContent() {
   };
 
   const handleLogout = () => {
-    // Reset role to default owner upon logout & return to public Landing Page
+    // Reset role to default owner upon logout & return to Login Page on APK or Landing Page on Web
     setCurrentRole('owner');
-    setViewMode('landing');
-    setIsAuthOpen(false);
+    const isNativeApk =
+      Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
+      Boolean((window as any).Capacitor?.getPlatform?.() === 'android') ||
+      Boolean((window as any).Capacitor?.platform === 'android');
+
+    if (isNativeApk) {
+      setViewMode('app');
+      setIsAuthOpen(true);
+    } else {
+      setViewMode('landing');
+      setIsAuthOpen(false);
+    }
   };
 
   if (viewMode === 'landing') {

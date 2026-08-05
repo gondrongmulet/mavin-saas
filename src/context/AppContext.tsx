@@ -145,17 +145,17 @@ const STORAGE_KEYS = {
 };
 
 const DEFAULT_INITIAL_TENANT: TenantAccount = {
-  id: 'TNT-001',
-  storeName: 'Kopi & Bakery Juara',
-  ownerName: 'Bapak Ahmad',
-  email: 'ahmad@mavin.id',
+  id: 'TNT-ALVINA-001',
+  storeName: 'Toko Ibu Alvina',
+  ownerName: 'Ibu Alvina',
+  email: 'alvina@mavin.id',
   phone: '081234567890',
   plan: 'Pro',
   status: 'Aktif',
   expiryDate: '2026-12-31',
   monthlyFee: 69000,
-  outletCount: 2,
-  registerDate: '2026-01-15'
+  outletCount: 1,
+  registerDate: '2026-08-05'
 };
 
 function getInitialTenantsList(): TenantAccount[] {
@@ -164,6 +164,11 @@ function getInitialTenantsList(): TenantAccount[] {
   
   let list: TenantAccount[] = savedTenantsStr ? JSON.parse(savedTenantsStr) : [];
 
+  // Guarantee Toko Ibu Alvina is included
+  if (!list.some(t => t.ownerName?.toLowerCase().includes('alvina') || t.email?.toLowerCase().includes('alvina'))) {
+    list.unshift(DEFAULT_INITIAL_TENANT);
+  }
+
   if (registeredUsersStr) {
     try {
       const regUsers = JSON.parse(registeredUsersStr);
@@ -171,7 +176,7 @@ function getInitialTenantsList(): TenantAccount[] {
         if (u.email && u.email !== 'admin@mavin.id' && !list.some(t => t.email.trim().toLowerCase() === u.email.trim().toLowerCase())) {
           list.push({
             id: `TNT-REG-${Date.now()}`,
-            storeName: u.storeName || 'Toko UMKM',
+            storeName: u.storeName || `Toko ${u.ownerName || 'UMKM'}`,
             ownerName: u.ownerName || 'Pemilik Toko',
             email: u.email,
             phone: u.phone || '08123456789',
@@ -185,11 +190,6 @@ function getInitialTenantsList(): TenantAccount[] {
         }
       });
     } catch (e) {}
-  }
-
-  // GUARANTEE: If list is empty, fallback to DEFAULT_INITIAL_TENANT so store list is NEVER 0!
-  if (list.length === 0) {
-    list = [DEFAULT_INITIAL_TENANT];
   }
 
   localStorage.setItem('mavin_tenants_v5', JSON.stringify(list));

@@ -12,6 +12,31 @@ const HEADERS = {
 
 // 1. Tenant Accounts Cloud Sync
 export async function syncCloudTenantsFetch(): Promise<TenantAccount[]> {
+  const cloudList: TenantAccount[] = [];
+
+  // A. Fetch from REST Cloud Object Storage
+  try {
+    const cloudIdsStr = localStorage.getItem('mavin_cloud_tenant_ids') || '["ff8081819f7e10ae019fd232270d79b5"]';
+    const cloudIds: string[] = JSON.parse(cloudIdsStr);
+    if (cloudIds.length > 0) {
+      const queryStr = cloudIds.map(id => `id=${id}`).join('&');
+      const res = await fetch(`https://api.restful-api.dev/objects?${queryStr}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          data.forEach(item => {
+            if (item.data && item.data.email) {
+              cloudList.push(item.data);
+            }
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('REST cloud fetch error:', e);
+  }
+
+  // B. Fetch from Supabase REST API
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/tenants?select=*`, {
       method: 'GET',
@@ -20,30 +45,39 @@ export async function syncCloudTenantsFetch(): Promise<TenantAccount[]> {
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
-        const formatted: TenantAccount[] = data.map((t: any) => ({
-          id: t.id || `TNT-${t.email}`,
-          storeName: t.store_name || t.storeName || 'Toko UMKM',
-          ownerName: t.owner_name || t.ownerName || 'Pemilik Toko',
-          email: t.email,
-          phone: t.phone || '',
-          plan: t.plan || 'Pro',
-          status: t.status || 'Aktif',
-          expiryDate: t.expiry_date || '2026-12-31',
-          monthlyFee: t.plan === 'Enterprise' ? 149000 : 69000,
-          outletCount: 1,
-          registerDate: t.created_at ? t.created_at.split('T')[0] : '2026-08-05'
-        }));
-        localStorage.setItem('mavin_tenants_v5', JSON.stringify(formatted));
-        return formatted;
+        data.forEach((t: any) => {
+          if (t.email && !cloudList.some(c => c.email.trim().toLowerCase() === t.email.trim().toLowerCase())) {
+            cloudList.push({
+              id: t.id || `TNT-${t.email}`,
+              storeName: t.store_name || t.storeName || 'Toko UMKM',
+              ownerName: t.owner_name || t.ownerName || 'Pemilik Toko',
+              email: t.email,
+              phone: t.phone || '',
+              plan: t.plan || 'Pro',
+              status: t.status || 'Aktif',
+              expiryDate: t.expiry_date || '2026-12-31',
+              monthlyFee: t.plan === 'Enterprise' ? 149000 : 69000,
+              outletCount: 1,
+              registerDate: t.created_at ? t.created_at.split('T')[0] : '2026-08-05'
+            });
+          }
+        });
       }
     }
   } catch (e) {
-    console.warn('Supabase cloud fetch fallback:', e);
+    console.warn('Supabase cloud fetch error:', e);
   }
 
+  // C. Fallback to Local Storage & Registered Users
   const saved = localStorage.getItem('mavin_tenants_v5');
   const regUsersStr = localStorage.getItem('mavin_registered_users');
   let list: TenantAccount[] = saved ? JSON.parse(saved) : [];
+
+  cloudList.forEach(c => {
+    if (!list.some(l => l.email.trim().toLowerCase() === c.email.trim().toLowerCase())) {
+      list.push(c);
+    }
+  });
 
   if (regUsersStr) {
     try {
@@ -68,10 +102,37 @@ export async function syncCloudTenantsFetch(): Promise<TenantAccount[]> {
     } catch (e) {}
   }
 
+  localStorage.setItem('mavin_tenants_v5', JSON.stringify(list));
   return list;
 }
 
 export async function syncCloudTenantSave(tenant: TenantAccount): Promise<void> {
+  // A. Save to REST Cloud Object Storage
+  try {
+    const res = await fetch('https://api.restful-api.dev/objects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'MAVIN_TENANT_V6',
+        data: tenant
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.id) {
+        const cloudIdsStr = localStorage.getItem('mavin_cloud_tenant_ids') || '["ff8081819f7e10ae019fd232270d79b5"]';
+        const cloudIds: string[] = JSON.parse(cloudIdsStr);
+        if (!cloudIds.includes(data.id)) {
+          cloudIds.push(data.id);
+          localStorage.setItem('mavin_cloud_tenant_ids', JSON.stringify(cloudIds));
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('REST cloud save error:', e);
+  }
+
+  // B. Save to Supabase
   try {
     const payload = {
       store_name: tenant.storeName,

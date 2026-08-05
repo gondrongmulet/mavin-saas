@@ -38,7 +38,18 @@ export function AppContent() {
     return 'landing';
   });
 
-  const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<NavTab>(() => {
+    const sessionStr = localStorage.getItem('mavin_active_user_session');
+    if (sessionStr) {
+      try {
+        const session = JSON.parse(sessionStr);
+        if (session.role === 'saas_admin') return 'saas_admin';
+        if (session.role === 'cashier') return 'pos';
+        if (session.role === 'manager') return 'recipes';
+      } catch (e) {}
+    }
+    return 'dashboard';
+  });
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 

@@ -220,6 +220,13 @@ function getInitialTenantsList(): TenantAccount[] {
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentRole, setCurrentRole] = useState<UserRole>(() => {
+    const sessionStr = localStorage.getItem('mavin_active_user_session');
+    if (sessionStr) {
+      try {
+        const session = JSON.parse(sessionStr);
+        if (session.role) return session.role as UserRole;
+      } catch (e) {}
+    }
     const saved = localStorage.getItem(STORAGE_KEYS.ROLE);
     return (saved as UserRole) || 'owner';
   });
@@ -258,8 +265,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [storeSettings, setStoreSettings] = useState<StoreSettings>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    return saved ? JSON.parse(saved) : INITIAL_STORE_SETTINGS;
+    const sessionStr = localStorage.getItem('mavin_active_user_session');
+    const savedSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    let baseSettings = savedSettings ? JSON.parse(savedSettings) : INITIAL_STORE_SETTINGS;
+    if (sessionStr) {
+      try {
+        const session = JSON.parse(sessionStr);
+        if (session.storeName) {
+          baseSettings = { ...baseSettings, storeName: session.storeName };
+        }
+      } catch (e) {}
+    }
+    return baseSettings;
   });
 
   // Helper: check if active store is the demo store

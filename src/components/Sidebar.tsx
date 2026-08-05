@@ -39,7 +39,12 @@ export const Sidebar: React.FC<NavigationProps> = ({ activeTab, setActiveTab, on
   const lowStockCount = ingredients.filter(i => i.stock <= i.minStock).length;
 
   const handleDownloadApk = () => {
-    alert('📱 Mengunduh MAVIN_SaaS_v2.4_Installer.apk\n\nAplikasi siap diinstal di Tablet atau Smartphone Android Kasir Anda!');
+    const link = document.createElement('a');
+    link.href = '/MAVIN_SaaS_v2.4_Installer.apk';
+    link.download = 'MAVIN_SaaS_v2.4_Installer.apk';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Helper render logo (preset icon or custom uploaded image)

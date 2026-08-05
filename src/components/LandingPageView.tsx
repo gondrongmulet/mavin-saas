@@ -46,7 +46,12 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onOpenAuth, on
   const marginPercent = Math.round((profit / demoSellingPrice) * 100);
 
   const handleDownloadApk = () => {
-    alert('📱 Mengunduh MAVIN_SaaS_v2.4_Installer.apk\n\nAplikasi siap diinstal di Tablet atau Smartphone Android Kasir Anda!');
+    const link = document.createElement('a');
+    link.href = '/MAVIN_SaaS_v2.4_Installer.apk';
+    link.download = 'MAVIN_SaaS_v2.4_Installer.apk';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (

@@ -19,14 +19,15 @@ import {
   Landmark,
   Phone,
   Save,
-  Check
+  Check,
+  Lock
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { formatIdr } from '../utils/calculator';
 import { TenantAccount } from '../types';
 
 export const SaasAdminView: React.FC = () => {
-  const { tenantAccounts, updateTenantStatus, addTenantAccount } = useApp();
+  const { tenantAccounts, updateTenantStatus, addTenantAccount, addStaffUser } = useApp();
 
   const [activeAdminSubTab, setActiveAdminSubTab] = useState<'tenants' | 'payment_setup'>('tenants');
 
@@ -35,6 +36,7 @@ export const SaasAdminView: React.FC = () => {
   const [newStoreName, setNewStoreName] = useState('');
   const [newOwnerName, setNewOwnerName] = useState('');
   const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('123456');
   const [newPhone, setNewPhone] = useState('');
   const [newPlan, setNewPlan] = useState<'Starter' | 'Pro' | 'Enterprise'>('Pro');
 
@@ -74,12 +76,38 @@ export const SaasAdminView: React.FC = () => {
       registerDate: new Date().toISOString().split('T')[0]
     };
 
+    // 1. Add Tenant to Subscription Table
     addTenantAccount(newTenant);
+
+    // 2. Automatically sync Credential User for Store Owner Login!
+    addStaffUser({
+      name: `${newOwnerName} (Pemilik)`,
+      email: newEmail,
+      role: 'owner',
+      outletName: newStoreName,
+      status: 'Aktif'
+    });
+
+    // 3. Save Credential mapping into LocalStorage accounts registry
+    const registeredUsers = JSON.parse(localStorage.getItem('mavin_registered_users') || '[]');
+    registeredUsers.push({
+      email: newEmail,
+      password: newPassword || '123456',
+      role: 'owner',
+      storeName: newStoreName,
+      ownerName: newOwnerName,
+      phone: newPhone
+    });
+    localStorage.setItem('mavin_registered_users', JSON.stringify(registeredUsers));
+
+    alert(`✅ Toko "${newStoreName}" berhasil didaftarkan!\n\nPemilik toko sekarang dapat login menggunakan:\n📧 Email: ${newEmail}\n🔑 Password: ${newPassword || '123456'}`);
+
     setIsAddModalOpen(false);
 
     setNewStoreName('');
     setNewOwnerName('');
     setNewEmail('');
+    setNewPassword('123456');
     setNewPhone('');
     setNewPlan('Pro');
   };
@@ -122,45 +150,60 @@ export const SaasAdminView: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* SaaS Master Admin Banner */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+      {/* SaaS Master Admin Banner - Responsive Layout */}
       <div style={{
         background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
         borderRadius: 'var(--radius-lg)',
-        padding: '2rem',
+        padding: '1.5rem',
         color: 'white',
         boxShadow: 'var(--shadow-xl)',
         display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '1rem'
+        flexDirection: 'column',
+        gap: '1.25rem',
+        width: '100%',
+        boxSizing: 'border-box'
       }}>
         <div>
           <span className="badge badge-amber" style={{ marginBottom: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
             <Crown size={14} /> SaaS Master Admin Portal (Pemilik Platform MAVIN)
           </span>
-          <h1 style={{ color: 'white', fontSize: '1.8rem', marginBottom: '0.35rem' }}>
+          <h1 style={{ color: 'white', fontSize: 'clamp(1.4rem, 4vw, 1.8rem)', marginBottom: '0.35rem' }}>
             Pusat Pengelolaan Pelanggan & Pembayaran SaaS
           </h1>
-          <p style={{ color: '#94a3b8', fontSize: '0.95rem', maxWidth: '650px' }}>
+          <p style={{ color: '#94a3b8', fontSize: '0.9rem', maxWidth: '650px' }}>
             Di modul ini, Anda mengelola seluruh tenant toko yang mendaftar, mengatur nomor QRIS/Rekening Bank pembayaran langganan, dan memantau omset bulanan (MRR).
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        {/* Action Buttons & MRR Box Layout */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'stretch',
+          flexWrap: 'wrap',
+          gap: '1rem',
+          width: '100%'
+        }}>
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="btn btn-emerald"
-            style={{ padding: '0.75rem 1.25rem', fontWeight: 800, fontSize: '0.9rem' }}
+            style={{ padding: '0.75rem 1.25rem', fontWeight: 800, fontSize: '0.9rem', flex: '1 1 220px', justifyContent: 'center' }}
           >
             <Plus size={18} /> Tambah Tenant Toko Baru
           </button>
 
-          <div style={{ background: '#334155', padding: '1rem 1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid #475569' }}>
-            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>MONTHLY RECURRING REVENUE (MRR)</span>
-            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#38bdf8' }}>
-              {formatIdr(totalMrr)} <span style={{ fontSize: '0.8rem', fontWeight: 500, color: '#cbd5e1' }}>/ bulan</span>
+          <div style={{
+            background: '#334155',
+            padding: '0.85rem 1.15rem',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid #475569',
+            flex: '1 1 220px',
+            boxSizing: 'border-box'
+          }}>
+            <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>MONTHLY RECURRING REVENUE (MRR)</span>
+            <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#38bdf8' }}>
+              {formatIdr(totalMrr)} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#cbd5e1' }}>/ bulan</span>
             </div>
           </div>
         </div>
@@ -405,7 +448,7 @@ export const SaasAdminView: React.FC = () => {
 
             {/* Bank 1 */}
             <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', marginBottom: '1rem' }}>
-              <h4 style={{ fontSize: '0.95rem', color: 'var(--primary)', marginBottom: '0.75rem' }}>🏦 Rekening Bank Utam (Bank 1)</h4>
+              <h4 style={{ fontSize: '0.95rem', color: 'var(--primary)', marginBottom: '0.75rem' }}>🏦 Rekening Bank Utama (Bank 1)</h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Nama Bank</label>
@@ -551,7 +594,7 @@ export const SaasAdminView: React.FC = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Email Pemilik *</label>
+                <label className="form-label">Email Pemilik (Untuk Login Toko) *</label>
                 <input
                   type="email"
                   required
@@ -560,6 +603,19 @@ export const SaasAdminView: React.FC = () => {
                   onChange={e => setNewEmail(e.target.value)}
                   className="form-control"
                 />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Password Akses Pemilik *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Password untuk login"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  className="form-control"
+                />
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>💡 Email & Password ini yang digunakan Pemilik Toko untuk login.</span>
               </div>
 
               <div className="form-group">

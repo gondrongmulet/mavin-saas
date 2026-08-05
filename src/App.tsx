@@ -16,9 +16,12 @@ import { UserRole } from './types';
 import { Lock, Award, ShieldAlert, ArrowRight } from 'lucide-react';
 
 export function AppContent() {
+  // Check active session presence
+  const hasActiveSession = Boolean(localStorage.getItem('mavin_active_user_session')) || localStorage.getItem('mavin_is_logged_in') === 'true';
+
   // Strict Authentication Guard State
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    return localStorage.getItem('mavin_is_logged_in') === 'true';
+    return hasActiveSession;
   });
 
   // Detect Capacitor Native Android Platform
@@ -29,7 +32,7 @@ export function AppContent() {
 
   // Preserve session on page refresh (don't log out or return to landing page on refresh!)
   const [viewMode, setViewMode] = useState<'landing' | 'app'>(() => {
-    if (isNativeApk || localStorage.getItem('mavin_is_logged_in') === 'true') {
+    if (isNativeApk || hasActiveSession) {
       return 'app';
     }
     return 'landing';

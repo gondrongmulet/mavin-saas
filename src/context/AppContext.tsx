@@ -24,6 +24,7 @@ import {
   INITIAL_STORE_SETTINGS
 } from '../utils/sampleData';
 import { calculateRecipeHppDetails } from '../utils/calculator';
+import { syncCloudTenantsFetch, syncCloudTenantSave } from '../utils/supabaseSync';
 
 const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
   manager: {
@@ -129,18 +130,18 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  ROLE: 'mavin_current_role_v1',
-  ROLE_PERMISSIONS: 'mavin_role_permissions_v2',
-  STAFF: 'mavin_staff_v2',
+  ROLE: 'mavin_current_role',
+  ROLE_PERMISSIONS: 'mavin_role_permissions',
   TENANTS: 'mavin_tenants_v5',
-  OUTLETS: 'mavin_outlets_v1',
-  SUPPLIERS: 'mavin_suppliers_v1',
-  SETTINGS: 'mavin_settings_v1',
-  INGREDIENTS: 'mavin_ingredients_v1',
-  RECIPES: 'mavin_recipes_v1',
-  PURCHASES: 'mavin_purchases_v1',
-  PRODUCTIONS: 'mavin_productions_v1',
-  SALES: 'mavin_sales_v1',
+  STAFF: 'mavin_staff_users',
+  OUTLETS: 'mavin_outlets',
+  SUPPLIERS: 'mavin_suppliers',
+  SETTINGS: 'mavin_store_settings',
+  INGREDIENTS: 'mavin_ingredients',
+  RECIPES: 'mavin_recipes',
+  PURCHASES: 'mavin_purchases',
+  PRODUCTIONS: 'mavin_productions',
+  SALES: 'mavin_sales'
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -158,6 +159,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = localStorage.getItem(STORAGE_KEYS.TENANTS);
     return saved ? JSON.parse(saved) : INITIAL_TENANT_ACCOUNTS;
   });
+
+  // Fetch Cloud Tenants from Supabase Realtime DB on mount
+  useEffect(() => {
+    syncCloudTenantsFetch().then(cloudTenants => {
+      if (cloudTenants && cloudTenants.length > 0) {
+        setTenantAccounts(cloudTenants);
+      }
+    });
+  }, []);
 
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.STAFF);
@@ -179,29 +189,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_STORE_SETTINGS;
   });
 
+  // Helper: check if active store is the demo store
+  const activeSessionStr = localStorage.getItem('mavin_active_user_session');
+  const isDemoStore = activeSessionStr ? JSON.parse(activeSessionStr).storeName === 'MAVIN Kopi & Bakery' : false;
+
   const [ingredients, setIngredients] = useState<Ingredient[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.INGREDIENTS);
-    return saved ? JSON.parse(saved) : INITIAL_INGREDIENTS;
+    if (saved) return JSON.parse(saved);
+    return isDemoStore ? INITIAL_INGREDIENTS : [];
   });
 
   const [recipes, setRecipes] = useState<Recipe[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.RECIPES);
-    return saved ? JSON.parse(saved) : INITIAL_RECIPES;
+    if (saved) return JSON.parse(saved);
+    return isDemoStore ? INITIAL_RECIPES : [];
   });
 
   const [purchases, setPurchases] = useState<PurchaseRecord[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.PURCHASES);
-    return saved ? JSON.parse(saved) : INITIAL_PURCHASES;
+    if (saved) return JSON.parse(saved);
+    return isDemoStore ? INITIAL_PURCHASES : [];
   });
 
   const [productions, setProductions] = useState<ProductionBatch[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.PRODUCTIONS);
-    return saved ? JSON.parse(saved) : INITIAL_PRODUCTIONS;
+    if (saved) return JSON.parse(saved);
+    return isDemoStore ? INITIAL_PRODUCTIONS : [];
   });
 
   const [sales, setSales] = useState<SaleTransaction[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.SALES);
-    return saved ? JSON.parse(saved) : INITIAL_SALES;
+    if (saved) return JSON.parse(saved);
+    return isDemoStore ? INITIAL_SALES : [];
   });
 
   // Sync to LocalStorage
@@ -254,6 +273,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addTenantAccount = (tenantData: Omit<TenantAccount, 'id'>) => {
     const newTenant: TenantAccount = { ...tenantData, id: `t-${Date.now()}` };
     setTenantAccounts(prev => [newTenant, ...prev]);
+    syncCloudTenantSave(newTenant);
   };
 
   // Staff Users Actions

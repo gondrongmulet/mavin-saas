@@ -91,13 +91,21 @@ export const Sidebar: React.FC<NavigationProps> = ({ activeTab, setActiveTab, on
   // Select navigation list cleanly
   const rawNavItems = currentRole === 'saas_admin' ? saasAdminNavItems : storeNavItems;
   const navItems = rawNavItems.filter(item => hasTabAccess(currentRole, item.id));
-  const mobileNavItems = navItems.slice(0, 5);
+  // Mobile Navigation items priority selection (Always includes Dashboard, POS, Recipes, Ingredients, and Settings!)
+  const storeMobilePriority: NavTab[] = ['dashboard', 'pos', 'recipes', 'ingredients', 'settings'];
+  const mobileNavItems = currentRole === 'saas_admin'
+    ? navItems
+    : storeNavItems.filter(item => storeMobilePriority.includes(item.id));
 
   return (
     <>
       {/* 1. Mobile Top Header Bar */}
       <header className="mobile-top-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div
+          onClick={() => setActiveTab(currentRole === 'saas_admin' ? 'saas_admin' : 'settings')}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}
+          title="Klik untuk Pengaturan Profil Toko"
+        >
           <div style={{
             width: '34px',
             height: '34px',
@@ -126,6 +134,25 @@ export const Sidebar: React.FC<NavigationProps> = ({ activeTab, setActiveTab, on
 
         {/* Mobile Header Logout & Action Buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          {currentRole !== 'saas_admin' && (
+            <button
+              onClick={() => setActiveTab('settings')}
+              className="btn btn-outline"
+              style={{
+                fontSize: '0.72rem',
+                padding: '0.35rem 0.6rem',
+                color: 'var(--primary)',
+                borderColor: 'var(--primary)',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.25rem'
+              }}
+            >
+              <Settings size={13} /> Setting
+            </button>
+          )}
+
           {onLogout && (
             <button
               onClick={onLogout}

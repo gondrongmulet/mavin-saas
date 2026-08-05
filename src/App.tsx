@@ -39,7 +39,25 @@ export function AppContent() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
-  const { currentRole, setCurrentRole, hasTabAccess, storeSettings } = useApp();
+  const { currentRole, setCurrentRole, hasTabAccess, storeSettings, updateStoreSettings } = useApp();
+
+  // Restore active user session & store name on refresh
+  useEffect(() => {
+    const sessionStr = localStorage.getItem('mavin_active_user_session');
+    if (sessionStr) {
+      try {
+        const session = JSON.parse(sessionStr);
+        if (session.storeName && session.storeName !== storeSettings.storeName) {
+          updateStoreSettings({ storeName: session.storeName });
+        }
+        if (session.role && session.role !== currentRole) {
+          setCurrentRole(session.role);
+        }
+      } catch (e) {
+        console.warn('Session parse error:', e);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (isNativeApk) {

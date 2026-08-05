@@ -144,54 +144,20 @@ const STORAGE_KEYS = {
   SALES: 'mavin_sales'
 };
 
-const DEFAULT_SEED_TENANTS: TenantAccount[] = [
-  {
-    id: 'TNT-001',
-    storeName: 'Kopi Senja Lembang',
-    ownerName: 'Bapak Ahmad',
-    email: 'ahmad@kopisenja.id',
-    phone: '081234567890',
-    plan: 'Pro',
-    status: 'Aktif',
-    expiryDate: '2026-12-31',
-    monthlyFee: 69000,
-    outletCount: 2,
-    registerDate: '2026-01-15'
-  },
-  {
-    id: 'TNT-002',
-    storeName: 'Bakery Roti Juara',
-    ownerName: 'Ibu Ratna',
-    email: 'ratna@rotijuara.id',
-    phone: '082198765432',
-    plan: 'Enterprise',
-    status: 'Aktif',
-    expiryDate: '2026-11-30',
-    monthlyFee: 149000,
-    outletCount: 5,
-    registerDate: '2026-02-01'
-  },
-  {
-    id: 'TNT-003',
-    storeName: 'Dapur Ayam Geprek 88',
-    ownerName: 'Mas Hendra',
-    email: 'hendra@geprek88.id',
-    phone: '085712349876',
-    plan: 'Starter',
-    status: 'Trial',
-    expiryDate: '2026-08-15',
-    monthlyFee: 0,
-    outletCount: 1,
-    registerDate: '2026-08-01'
-  }
-];
-
 function getInitialTenantsList(): TenantAccount[] {
   const savedTenantsStr = localStorage.getItem('mavin_tenants_v5');
   const registeredUsersStr = localStorage.getItem('mavin_registered_users');
   
-  let list: TenantAccount[] = savedTenantsStr ? JSON.parse(savedTenantsStr) : [...DEFAULT_SEED_TENANTS];
+  let list: TenantAccount[] = savedTenantsStr ? JSON.parse(savedTenantsStr) : [];
   
+  // Clean filter: Remove old dummy demo stores permanently!
+  list = list.filter(t => 
+    t.email !== 'ahmad@kopisenja.id' && 
+    t.email !== 'ratna@rotijuara.id' && 
+    t.email !== 'hendra@geprek88.id' &&
+    t.email !== 'dewi@estehsolo.id'
+  );
+
   if (registeredUsersStr) {
     try {
       const regUsers = JSON.parse(registeredUsersStr);
@@ -215,7 +181,8 @@ function getInitialTenantsList(): TenantAccount[] {
     } catch (e) {}
   }
   
-  return list.length > 0 ? list : DEFAULT_SEED_TENANTS;
+  localStorage.setItem('mavin_tenants_v5', JSON.stringify(list));
+  return list;
 }
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

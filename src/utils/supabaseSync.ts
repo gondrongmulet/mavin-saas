@@ -28,7 +28,13 @@ export async function syncCloudTenantsFetch(): Promise<TenantAccount[]> {
     console.warn('Supabase cloud fetch fallback to local:', e);
   }
   const saved = localStorage.getItem('mavin_tenants_v5');
-  return saved ? JSON.parse(saved) : [];
+  let list: TenantAccount[] = saved ? JSON.parse(saved) : [];
+  return list.filter(t => 
+    t.email !== 'ahmad@kopisenja.id' && 
+    t.email !== 'ratna@rotijuara.id' && 
+    t.email !== 'hendra@geprek88.id' &&
+    t.email !== 'dewi@estehsolo.id'
+  );
 }
 
 export async function syncCloudTenantSave(tenant: TenantAccount): Promise<void> {

@@ -253,7 +253,7 @@ export const RecipesView: React.FC = () => {
             <form onSubmit={handleSubmit}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 {/* General Info */}
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '0.75rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Nama Resep *</label>
                     <input
@@ -302,8 +302,8 @@ export const RecipesView: React.FC = () => {
 
                 {/* 1. Raw Materials Composition Section */}
                 <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <h4 style={{ fontSize: '0.9rem' }}>1. Komposisi Bahan Baku (per 1 Batch Masak)</h4>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 800 }}>1. Komposisi Bahan Baku (per 1 Batch Masak)</h4>
                     <button type="button" onClick={handleAddIngredientRow} className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}>
                       <Plus size={14} /> Tambah Bahan
                     </button>
@@ -314,13 +314,13 @@ export const RecipesView: React.FC = () => {
                       Belum ada bahan baku. Klik "Tambah Bahan" di atas.
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                       {recipeIngredients.map((ri, idx) => {
                         const ing = ingredients.find(i => i.id === ri.ingredientId);
                         const lineCost = ing ? ri.quantity * ing.costPerUnit : 0;
 
                         return (
-                          <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto auto', gap: '0.5rem', alignItems: 'center' }}>
+                          <div key={idx} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.5rem', alignItems: 'center', background: '#ffffff', padding: '0.65rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
                             <select
                               value={ri.ingredientId}
                               onChange={e => {
@@ -329,10 +329,11 @@ export const RecipesView: React.FC = () => {
                                 setRecipeIngredients(updated);
                               }}
                               className="form-control"
+                              style={{ fontWeight: 700 }}
                             >
                               {ingredients.map(i => (
                                 <option key={i.id} value={i.id}>
-                                  {i.name} (HPP: {formatIdr(i.costPerUnit)}/{i.unit})
+                                  🧪 {i.name.toUpperCase()} (HPP: {formatIdr(i.costPerUnit)}/{i.unit})
                                 </option>
                               ))}
                             </select>
@@ -350,14 +351,14 @@ export const RecipesView: React.FC = () => {
                                 }}
                                 className="form-control"
                               />
-                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{ing?.unit}</span>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 700 }}>{ing?.unit}</span>
                             </div>
 
-                            <div style={{ fontSize: '0.85rem', fontWeight: 700, minWidth: '90px', textAlign: 'right' }}>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--primary)', textAlign: 'right' }}>
                               {formatIdr(lineCost)}
                             </div>
 
-                            <button type="button" onClick={() => handleRemoveIngredientRow(idx)} className="btn btn-danger" style={{ padding: '0.3rem 0.5rem' }}>
+                            <button type="button" onClick={() => handleRemoveIngredientRow(idx)} className="btn btn-outline" style={{ padding: '0.3rem 0.5rem', color: 'var(--accent-rose)', borderColor: '#fca5a5', justifySelf: 'end' }}>
                               <Trash2 size={14} />
                             </button>
                           </div>
@@ -373,8 +374,8 @@ export const RecipesView: React.FC = () => {
 
                 {/* 2. Overhead & Operational Cost Section */}
                 <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <h4 style={{ fontSize: '0.9rem' }}>2. Alokasi Biaya Overhead & Operasional (per Batch)</h4>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 800 }}>2. Alokasi Biaya Overhead & Operasional (per Batch)</h4>
                     <button type="button" onClick={handleAddOverheadRow} className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}>
                       <Plus size={14} /> Tambah Overhead
                     </button>
@@ -382,10 +383,10 @@ export const RecipesView: React.FC = () => {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {overheads.map(ov => (
-                      <div key={ov.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '0.5rem', alignItems: 'center' }}>
+                      <div key={ov.id} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.5rem', alignItems: 'center' }}>
                         <input
                           type="text"
-                          placeholder="Nama Overhead (e.g. Kemasan, Listrik & Gas)"
+                          placeholder="Nama Overhead (e.g. Kemasan, Listrik)"
                           value={ov.name}
                           onChange={e => {
                             setOverheads(overheads.map(o => o.id === ov.id ? { ...o, name: e.target.value } : o));
@@ -402,7 +403,7 @@ export const RecipesView: React.FC = () => {
                           }}
                           className="form-control"
                         />
-                        <button type="button" onClick={() => handleRemoveOverheadRow(ov.id)} className="btn btn-danger" style={{ padding: '0.3rem 0.5rem' }}>
+                        <button type="button" onClick={() => handleRemoveOverheadRow(ov.id)} className="btn btn-outline" style={{ padding: '0.3rem 0.5rem', color: 'var(--accent-rose)', borderColor: '#fca5a5', justifySelf: 'end' }}>
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -416,14 +417,14 @@ export const RecipesView: React.FC = () => {
 
                 {/* 3. Dynamic Calculator Engine Section */}
                 <div style={{ background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid #c7d2fe' }}>
-                  <h4 style={{ color: 'var(--primary)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <h4 style={{ color: 'var(--primary)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800 }}>
                     <Calculator size={18} /> Kalkulator Harga Jual & Profit Margin Enterprise
                   </h4>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
                     {/* HPP Result Box */}
                     <div style={{ background: 'white', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>HASIL HPP RESEP</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>HASIL HPP RESEP</span>
                       <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-amber)' }}>
                         {formatIdr(tempHppDetails.hppPerUnit)} <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>/ {yieldUnit}</span>
                       </div>
@@ -433,8 +434,8 @@ export const RecipesView: React.FC = () => {
                     </div>
 
                     {/* Pricing Input Calculator */}
-                    <div style={{ background: 'white', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <div style={{ background: 'white', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', boxSizing: 'border-box' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
                         <button
                           type="button"
                           className={`btn ${calcMode === 'price' ? 'btn-primary' : 'btn-outline'}`}

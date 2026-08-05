@@ -1,131 +1,91 @@
 import React, { useState } from 'react';
-import { Plus, ShoppingCart, Calendar, Truck, ArrowUpRight, Trash2, CheckCircle2, TrendingUp } from 'lucide-react';
+import { ShoppingCart, Plus, Trash2, Truck, Calendar, ArrowRight, Boxes } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { PurchaseItem } from '../types';
 import { formatIdr, formatNumber } from '../utils/calculator';
+import { PurchaseItem } from '../types';
 
 export const PurchasesView: React.FC = () => {
-  const { ingredients, purchases, addPurchase, recipes } = useApp();
+  const { ingredients, purchases, addPurchase } = useApp();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [supplier, setSupplier] = useState('');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<PurchaseItem[]>([]);
 
-  // Current item being added to form
-  const [selectedIngId, setSelectedIngId] = useState('');
+  // Item form input
+  const [selectedIngId, setSelectedIngId] = useState<string>(ingredients[0]?.id || '');
   const [itemQty, setItemQty] = useState<number>(0);
   const [itemTotalCost, setItemTotalCost] = useState<number>(0);
 
-  const openAddModal = () => {
-    setSupplier('');
-    setNotes('');
-    setItems([]);
-    if (ingredients.length > 0) {
-      setSelectedIngId(ingredients[0].id);
-    }
-    setItemQty(100);
-    setItemTotalCost(5000);
-    setIsModalOpen(true);
-  };
-
   const handleAddItem = () => {
-    const ing = ingredients.find(i => i.id === selectedIngId);
-    if (!ing || itemQty <= 0 || itemTotalCost <= 0) return;
-
-    const unitPrice = Math.round(itemTotalCost / itemQty);
-
-    // Check if already added
-    const existingIdx = items.findIndex(i => i.ingredientId === ing.id);
-    if (existingIdx !== -1) {
-      const updated = [...items];
-      const newQty = updated[existingIdx].quantity + itemQty;
-      const newTotal = updated[existingIdx].totalPrice + itemTotalCost;
-      updated[existingIdx] = {
-        ...updated[existingIdx],
-        quantity: newQty,
-        totalPrice: newTotal,
-        unitPrice: Math.round(newTotal / newQty)
-      };
-      setItems(updated);
-    } else {
-      setItems(prev => [
-        ...prev,
-        {
-          ingredientId: ing.id,
-          ingredientName: ing.name,
-          quantity: itemQty,
-          unit: ing.unit,
-          totalPrice: itemTotalCost,
-          unitPrice
-        }
-      ]);
+    if (!selectedIngId || itemQty <= 0 || itemTotalCost <= 0) {
+      alert('⚠️ Silakan pilih bahan baku, jumlah beli, dan total harga beli yang valid.');
+      return;
     }
 
-    // Reset current item inputs
+    const ing = ingredients.find(i => i.id === selectedIngId);
+    if (!ing) return;
+
+    const unitPrice = itemTotalCost / itemQty;
+    const newItem: PurchaseItem = {
+      ingredientId: ing.id,
+      ingredientName: ing.name,
+      quantity: itemQty,
+      unit: ing.unit,
+      totalPrice: itemTotalCost,
+      unitPrice
+    };
+
+    setItems([...items, newItem]);
+
+    // Reset item inputs
     setItemQty(0);
     setItemTotalCost(0);
   };
 
-  const handleRemoveItem = (ingId: string) => {
-    setItems(prev => prev.filter(i => i.ingredientId !== ingId));
+  const handleRemoveItem = (index: number) => {
+    setItems(items.filter((_, idx) => idx !== index));
   };
 
-  const grandTotalPurchaseCost = items.reduce((sum, i) => sum + i.totalPrice, 0);
+  const grandTotalCost = items.reduce((sum, item) => sum + item.totalPrice, 0);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (items.length === 0) {
-      alert('Tambahkan minimal 1 bahan baku yang dibeli saat kulakan!');
+      alert('⚠️ Belum ada bahan baku yang ditambahkan ke nota kulakan.');
       return;
     }
 
-    const now = new Date();
-    const dateStr = now.toISOString().replace('T', ' ').substring(0, 16);
-
     addPurchase({
-      date: dateStr,
-      supplier: supplier || 'Supplier Umum',
+      date: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      supplier: supplier.trim() || 'Supplier Umum',
       items,
-      totalCost: grandTotalPurchaseCost,
-      notes
+      totalCost: grandTotalCost,
+      notes: notes.trim()
     });
 
     setIsModalOpen(false);
-    alert('✅ Kulakan berhasil dicatat! Stok & HPP seluruh resep terkait telah diperbarui secara otomatis.');
+    setSupplier('');
+    setNotes('');
+    setItems([]);
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* Header */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%', boxSizing: 'border-box' }}>
+      {/* Header & Quick Action */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2>Pembelian & Kulakan Bahan Baku</h2>
-          <p style={{ fontSize: '0.875rem' }}>Catat pengeluaran restock bahan. Sistem akan memperbarui HPP per unit (WAC) & harga resep secara otomatis.</p>
+          <h2>Kulakan & Restock Bahan Baku</h2>
+          <p style={{ fontSize: '0.875rem' }}>Catat pengeluaran belanja bahan baku dari supplier untuk memperbarui stok & HPP WAC otomatis.</p>
         </div>
-        <button onClick={openAddModal} className="btn btn-primary" style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' }}>
-          <Plus size={18} /> Catat Kulakan Baru
-        </button>
-      </div>
 
-      {/* Info Banner */}
-      <div style={{
-        background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-        border: '1px solid #6ee7b7',
-        borderRadius: 'var(--radius-md)',
-        padding: '1.25rem',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '1rem'
-      }}>
-        <div style={{ width: '40px', height: '40px', background: '#059669', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <TrendingUp size={20} />
-        </div>
-        <div style={{ color: '#064e3b', fontSize: '0.9rem' }}>
-          <strong>Bagaimana Engine HPP Dinamis Bekerja saat Kulakan?</strong>
-          <br />
-          Saat harga beli bahan di pasar naik/turun, input transaksi kulakan Anda akan langsung menghitung ulang nilai <em>Weighted Average Cost</em>. Seluruh resep yang mengandung bahan ini akan otomatis diperbarui nilai HPP & marginnya tanpa perlu dihitung ulang secara manual!
-        </div>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="btn btn-emerald"
+          style={{ padding: '0.75rem 1.5rem', fontWeight: 800 }}
+        >
+          <Plus size={18} /> Restock / Input Kulakan Baru
+        </button>
       </div>
 
       {/* Purchase Log History */}
@@ -147,7 +107,7 @@ export const PurchasesView: React.FC = () => {
                       <Calendar size={14} /> {pur.date}
                     </span>
                   </div>
-                  <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-main)' }}>
+                  <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-main)', fontSize: '1.05rem', fontWeight: 800 }}>
                     <Truck size={18} color="var(--text-muted)" /> {pur.supplier}
                   </h4>
                   {pur.notes && <p style={{ fontSize: '0.8rem', fontStyle: 'italic', marginTop: '0.2rem' }}>"{pur.notes}"</p>}
@@ -164,16 +124,16 @@ export const PurchasesView: React.FC = () => {
               {/* Items Breakdown Table */}
               <div style={{ background: '#f8fafc', borderRadius: 'var(--radius-sm)', padding: '0.75rem 1rem', border: '1px solid var(--border-color)' }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
-                  Detail Bahan Baku Dibelii:
+                  Detail Bahan Baku Dibeli:
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   {pur.items.map((item, idx) => (
                     <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
                       <div>
-                        <strong>{item.ingredientName}</strong> &bull; {formatNumber(item.quantity)} {item.unit}
+                        <strong style={{ fontWeight: 800, color: '#0f172a' }}>{item.ingredientName}</strong> &bull; <span style={{ color: '#475569', fontWeight: 600 }}>{formatNumber(item.quantity)} {item.unit}</span>
                       </div>
-                      <div>
-                        {formatIdr(item.totalPrice)} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>({formatIdr(item.unitPrice)}/{item.unit})</span>
+                      <div style={{ fontWeight: 700 }}>
+                        {formatIdr(item.totalPrice)} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>({formatIdr(item.unitPrice)}/{item.unit})</span>
                       </div>
                     </div>
                   ))}
@@ -184,189 +144,181 @@ export const PurchasesView: React.FC = () => {
         )}
       </div>
 
-      {/* Record Purchase Modal */}
+      {/* Record Purchase Modal - Clean Responsive Grid */}
       {isModalOpen && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '750px' }}>
-            <div className="modal-header">
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div className="modal-content" style={{ maxWidth: '720px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
+              <h3 style={{ fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <ShoppingCart size={20} color="var(--accent-emerald)" /> Input Transaksi Kulakan / Restock
               </h3>
-              <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>
+              <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-muted)', padding: '0.2rem' }}>
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSubmit}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div className="form-group">
-                    <label className="form-label">Nama Supplier / Toko Kulakan</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Toko Bahan Kue Maju, Pasar Central, Distributor"
-                      value={supplier}
-                      onChange={e => setSupplier(e.target.value)}
-                      className="form-control"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Catatan Tambahan (Opsional)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Diskon pembelian grosir / Nota #991"
-                      value={notes}
-                      onChange={e => setNotes(e.target.value)}
-                      className="form-control"
-                    />
-                  </div>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Nama Supplier / Toko Kulakan *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Toko Bahan Kue Maju, Pasar Central"
+                    value={supplier}
+                    onChange={e => setSupplier(e.target.value)}
+                    className="form-control"
+                  />
                 </div>
 
-                {/* Section for adding items */}
-                <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <h4 style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>Tambah Item Bahan Baku</h4>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '0.75rem', alignItems: 'end' }}>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label">Pilih Bahan</label>
-                      <select
-                        value={selectedIngId}
-                        onChange={e => setSelectedIngId(e.target.value)}
-                        className="form-control"
-                      >
-                        {ingredients.map(ing => (
-                          <option key={ing.id} value={ing.id}>
-                            {ing.name} (Stok: {ing.stock} {ing.unit} | HPP Saat ini: {formatIdr(ing.costPerUnit)}/{ing.unit})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label">Jumlah Beli</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={itemQty || ''}
-                        onChange={e => setItemQty(Number(e.target.value))}
-                        className="form-control"
-                        placeholder="Qty"
-                      />
-                    </div>
-
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label">Total Harga Beli (Rp)</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={itemTotalCost || ''}
-                        onChange={e => setItemTotalCost(Number(e.target.value))}
-                        className="form-control"
-                        placeholder="Total Rp"
-                      />
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleAddItem}
-                      className="btn btn-emerald"
-                      style={{ padding: '0.625rem 1rem' }}
-                    >
-                      <Plus size={16} /> Tambah
-                    </button>
-                  </div>
-
-                  {itemQty > 0 && itemTotalCost > 0 && (
-                    <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--accent-emerald)', fontWeight: 600 }}>
-                      💡 Estimasi Harga Beli per Unit: <strong>{formatIdr(itemTotalCost / itemQty)}</strong> / {ingredients.find(i => i.id === selectedIngId)?.unit}
-                    </div>
-                  )}
-                </div>
-
-                {/* List of items in current purchase */}
-                <div>
-                  <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>Daftar Bahan dalam Nota ini ({items.length} Item)</h4>
-                  {items.length === 0 ? (
-                    <div style={{ padding: '1.5rem', textAlign: 'center', background: '#fff', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                      Belum ada bahan baku yang ditambahkan ke nota kulakan.
-                    </div>
-                  ) : (
-                    <div className="table-container">
-                      <table className="custom-table">
-                        <thead>
-                          <tr>
-                            <th>Bahan Baku</th>
-                            <th>Jumlah</th>
-                            <th>Harga Unit Baru</th>
-                            <th>Total Beli</th>
-                            <th>Estimasi Dampak HPP WAC</th>
-                            <th>Aksi</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {items.map(item => {
-                            const currentIng = ingredients.find(i => i.id === item.ingredientId);
-                            if (!currentIng) return null;
-
-                            // Calculate expected new WAC
-                            const newStock = currentIng.stock + item.quantity;
-                            const newWac = newStock > 0
-                              ? Math.round(((currentIng.stock * currentIng.costPerUnit) + item.totalPrice) / newStock)
-                              : item.unitPrice;
-
-                            const diffWac = newWac - currentIng.costPerUnit;
-
-                            return (
-                              <tr key={item.ingredientId}>
-                                <td><strong>{item.ingredientName}</strong></td>
-                                <td>{formatNumber(item.quantity)} {item.unit}</td>
-                                <td>{formatIdr(item.unitPrice)}</td>
-                                <td style={{ fontWeight: 700 }}>{formatIdr(item.totalPrice)}</td>
-                                <td>
-                                  <div style={{ fontSize: '0.8rem' }}>
-                                    {formatIdr(currentIng.costPerUnit)} ➔ <strong style={{ color: 'var(--primary)' }}>{formatIdr(newWac)}</strong>
-                                    {diffWac !== 0 && (
-                                      <span style={{ fontSize: '0.7rem', marginLeft: '0.25rem', color: diffWac > 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)' }}>
-                                        ({diffWac > 0 ? `+${diffWac}` : diffWac})
-                                      </span>
-                                    )}
-                                  </div>
-                                </td>
-                                <td>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveItem(item.ingredientId)}
-                                    className="btn btn-danger"
-                                    style={{ padding: '0.25rem 0.5rem' }}
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                <div className="form-group">
+                  <label className="form-label">Catatan Tambahan (Opsional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Diskon pembelian grosir / Nota #991"
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
+                    className="form-control"
+                  />
                 </div>
               </div>
 
-              <div className="modal-footer">
-                <div style={{ marginRight: 'auto', textAlign: 'left' }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Pengeluaran Nota:</span>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--accent-emerald)' }}>
-                    {formatIdr(grandTotalPurchaseCost)}
-                  </div>
+              {/* Section for adding items - Clean Mobile Responsive Stack */}
+              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>Tambah Item Bahan Baku</h4>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Pilih Bahan Baku *</label>
+                  <select
+                    value={selectedIngId}
+                    onChange={e => setSelectedIngId(e.target.value)}
+                    className="form-control"
+                    style={{ fontWeight: 700, fontSize: '0.9rem' }}
+                  >
+                    {ingredients.map(ing => (
+                      <option key={ing.id} value={ing.id}>
+                        🧪 {ing.name.toUpperCase()} (Stok: {ing.stock} {ing.unit} | HPP Saat ini: {formatIdr(ing.costPerUnit)}/{ing.unit})
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary">
-                  Batal
-                </button>
-                <button type="submit" className="btn btn-emerald" disabled={items.length === 0}>
-                  <CheckCircle2 size={16} /> Simpan & Update HPP Otomatis
-                </button>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Jumlah Beli *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={itemQty || ''}
+                      onChange={e => setItemQty(Number(e.target.value))}
+                      className="form-control"
+                      placeholder="e.g. 10"
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Total Harga Beli (Rp) *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={itemTotalCost || ''}
+                      onChange={e => setItemTotalCost(Number(e.target.value))}
+                      className="form-control"
+                      placeholder="e.g. 50000"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddItem}
+                    className="btn btn-emerald"
+                    style={{ padding: '0.7rem 1.25rem', width: '100%', fontWeight: 800 }}
+                  >
+                    <Plus size={16} /> + Tambah Item
+                  </button>
+                </div>
+
+                {itemQty > 0 && itemTotalCost > 0 && (
+                  <div style={{ fontSize: '0.78rem', color: 'var(--accent-emerald)', fontWeight: 700 }}>
+                    💡 Estimasi Harga Beli per Unit: <strong>{formatIdr(itemTotalCost / itemQty)}</strong> / {ingredients.find(i => i.id === selectedIngId)?.unit}
+                  </div>
+                )}
+              </div>
+
+              {/* List of items in current purchase */}
+              <div>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 800, marginBottom: '0.5rem' }}>
+                  Daftar Bahan dalam Nota ini ({items.length} Item)
+                </h4>
+                {items.length === 0 ? (
+                  <div style={{ padding: '1.5rem', textAlign: 'center', background: '#fff', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    Belum ada bahan baku yang ditambahkan ke nota kulakan.
+                  </div>
+                ) : (
+                  <div className="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>BAHAN BAKU</th>
+                          <th>JUMLAH</th>
+                          <th>TOTAL HARGA (RP)</th>
+                          <th>HPP/UNIT BARU</th>
+                          <th>AKSI</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map((item, idx) => (
+                          <tr key={idx}>
+                            <td style={{ fontWeight: 800, color: '#0f172a' }}>{item.ingredientName}</td>
+                            <td>{formatNumber(item.quantity)} {item.unit}</td>
+                            <td style={{ fontWeight: 700 }}>{formatIdr(item.totalPrice)}</td>
+                            <td style={{ color: 'var(--accent-emerald)', fontWeight: 700 }}>
+                              {formatIdr(item.unitPrice)} / {item.unit}
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveItem(idx)}
+                                className="btn btn-outline"
+                                style={{ padding: '0.3rem 0.5rem', color: 'var(--accent-rose)', borderColor: '#fca5a5' }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Total Summary & Action Buttons */}
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 700 }}>Total Pengeluaran Nota:</span>
+                  <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-emerald)' }}>
+                    {formatIdr(grandTotalCost)}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    className="btn btn-outline"
+                    style={{ flex: 1, padding: '0.75rem' }}
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-emerald"
+                    style={{ flex: 2, padding: '0.75rem', fontWeight: 800 }}
+                  >
+                    ✓ Simpan & Update HPP Otomatis
+                  </button>
+                </div>
               </div>
             </form>
           </div>

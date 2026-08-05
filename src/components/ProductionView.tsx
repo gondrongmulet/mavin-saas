@@ -74,8 +74,8 @@ export const ProductionView: React.FC = () => {
                 className="form-control"
               >
                 {recipes.map(r => (
-                  <option key={r.id} value={r.id}>
-                    {r.name} (1 Batch = {r.batchYield} {r.yieldUnit} | Stok Siap: {r.finishedStock} {r.yieldUnit})
+                  <option key={r.id} value={r.id} style={{ fontWeight: 700 }}>
+                    🍳 {r.name.toUpperCase()} (1 Batch = {r.batchYield} {r.yieldUnit} | Stok: {r.finishedStock} {r.yieldUnit})
                   </option>
                 ))}
               </select>

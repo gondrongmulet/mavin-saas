@@ -1,0 +1,465 @@
+import React, { useState } from 'react';
+import {
+  Search,
+  ShoppingCart,
+  Plus,
+  Minus,
+  CheckCircle,
+  Printer,
+  X,
+  Send
+} from 'lucide-react';
+import { useApp } from '../context/AppContext';
+import type { SaleTransaction, SaleItem } from '../types';
+import { calculateRecipeHppDetails, formatIdr } from '../utils/calculator';
+
+export const PosView: React.FC = () => {
+  const { recipes, ingredients, addSaleTransaction, storeSettings } = useApp();
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [customerName, setCustomerName] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'Tunai' | 'QRIS' | 'Transfer Bank' | 'E-Wallet'>('QRIS');
+  const [discount, setDiscount] = useState<number>(0);
+  const [cashPaid, setCashPaid] = useState<number>(0);
+
+  // Cart State: Map of recipeId -> quantity
+  const [cart, setCart] = useState<{ [recipeId: string]: number }>({});
+
+  // Completed Receipt Modal State
+  const [completedSale, setCompletedSale] = useState<SaleTransaction | null>(null);
+
+  const categories = ['All', ...Array.from(new Set(recipes.map(r => r.category)))];
+
+  const filteredRecipes = recipes.filter(r => {
+    const matchesSearch = r.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCat = selectedCategory === 'All' || r.category === selectedCategory;
+    return matchesSearch && matchesCat;
+  });
+
+  const addToCart = (recipeId: string) => {
+    setCart(prev => ({
+      ...prev,
+      [recipeId]: (prev[recipeId] || 0) + 1
+    }));
+  };
+
+  const updateCartQty = (recipeId: string, delta: number) => {
+    setCart(prev => {
+      const current = prev[recipeId] || 0;
+      const next = current + delta;
+      if (next <= 0) {
+        const copy = { ...prev };
+        delete copy[recipeId];
+        return copy;
+      }
+      return { ...prev, [recipeId]: next };
+    });
+  };
+
+  const clearCart = () => {
+    setCart({});
+    setCustomerName('');
+    setDiscount(0);
+    setCashPaid(0);
+  };
+
+  // Cart calculations
+  const cartItems: SaleItem[] = Object.entries(cart).map(([recipeId, qty]) => {
+    const recipe = recipes.find(r => r.id === recipeId);
+    if (!recipe) return null as any;
+
+    const hppDetails = calculateRecipeHppDetails(recipe, ingredients);
+    const subtotal = recipe.sellingPrice * qty;
+    const totalHpp = hppDetails.hppPerUnit * qty;
+    const profit = subtotal - totalHpp;
+
+    return {
+      recipeId,
+      recipeName: recipe.name,
+      quantity: qty,
+      pricePerUnit: recipe.sellingPrice,
+      hppPerUnit: hppDetails.hppPerUnit,
+      subtotal,
+      totalHpp,
+      profit
+    };
+  }).filter(Boolean);
+
+  const cartSubtotal = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
+  const cartTotalHpp = cartItems.reduce((sum, item) => sum + item.totalHpp, 0);
+  
+  const taxAmount = Math.round((cartSubtotal * (storeSettings.taxPercent || 0)) / 100);
+  const serviceAmount = Math.round((cartSubtotal * (storeSettings.servicePercent || 0)) / 100);
+  const cartGrandTotal = Math.max(0, cartSubtotal + taxAmount + serviceAmount - discount);
+  const cartGrossProfit = cartGrandTotal - cartTotalHpp;
+  const change = Math.max(0, cashPaid - cartGrandTotal);
+
+  const handleCheckout = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (cartItems.length === 0) return;
+
+    if (paymentMethod === 'Tunai' && cashPaid < cartGrandTotal) {
+      alert(`Uang tunai kurang! Diperlukan ${formatIdr(cartGrandTotal)}, dibayar ${formatIdr(cashPaid)}.`);
+      return;
+    }
+
+    const saleRecord = addSaleTransaction({
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      customerName: customerName || 'Pelanggan Umum',
+      paymentMethod,
+      items: cartItems,
+      subtotal: cartSubtotal,
+      taxAmount,
+      serviceAmount,
+      discount,
+      grandTotal: cartGrandTotal,
+      totalHpp: cartTotalHpp,
+      grossProfit: cartGrossProfit,
+      cashPaid: paymentMethod === 'Tunai' ? cashPaid : cartGrandTotal,
+      change: paymentMethod === 'Tunai' ? change : 0
+    });
+
+    setCompletedSale(saleRecord);
+    clearCart();
+  };
+
+  const handleSendWhatsApp = () => {
+    if (!completedSale) return;
+
+    let itemsText = '';
+    completedSale.items.forEach(i => {
+      itemsText += `• ${i.quantity}x ${i.recipeName} = ${formatIdr(i.subtotal)}\n`;
+    });
+
+    const message = `*${storeSettings.storeName}*\n${storeSettings.address}\n----------------------------------\nInvoice: ${completedSale.invoiceNo}\nTanggal: ${completedSale.date}\nPelanggan: ${completedSale.customerName || 'Umum'}\n----------------------------------\n${itemsText}----------------------------------\nSubtotal: ${formatIdr(completedSale.subtotal)}\n` +
+      (completedSale.taxAmount > 0 ? `Pajak PB1 (${storeSettings.taxPercent}%): ${formatIdr(completedSale.taxAmount)}\n` : '') +
+      `*GRAND TOTAL: ${formatIdr(completedSale.grandTotal)}*\nMetode Bayar: ${completedSale.paymentMethod}\n----------------------------------\n_${storeSettings.footerNote}_`;
+
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://api.whatsapp.com/send?text=${encodedMessage}`, '_blank');
+  };
+
+  return (
+    <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+      {/* Left: Product Catalog */}
+      <div style={{ flex: '1 1 500px', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div>
+          <h2>Kasir POS Penjualan</h2>
+          <p style={{ fontSize: '0.875rem' }}>Pilih produk, catat pesanan pelanggan, dan otomatis hitung laba kotor & potong stok siap jual.</p>
+        </div>
+
+        {/* Filter & Search Bar */}
+        <div className="card" style={{ padding: '0.85rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+            <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              placeholder="Cari produk..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="form-control"
+              style={{ paddingLeft: '2.2rem', padding: '0.45rem 0.8rem 0.45rem 2.2rem' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.35rem', overflowX: 'auto' }}>
+            {categories.map(cat => (
+              <button
+                key={cat}
+                type="button"
+                className={`btn ${selectedCategory === cat ? 'btn-primary' : 'btn-outline'}`}
+                style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}
+                onClick={() => setSelectedCategory(cat)}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Product Cards Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
+          {filteredRecipes.map(recipe => {
+            const hppDetails = calculateRecipeHppDetails(recipe, ingredients);
+            const isOutOfStock = recipe.finishedStock <= 0;
+
+            return (
+              <div
+                key={recipe.id}
+                className="card"
+                style={{
+                  padding: '1rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  border: '1px solid var(--border-color)',
+                  opacity: isOutOfStock ? 0.7 : 1
+                }}
+              >
+                <div>
+                  <span className="badge badge-indigo" style={{ fontSize: '0.68rem', marginBottom: '0.35rem', display: 'inline-flex' }}>
+                    {recipe.category}
+                  </span>
+                  <h4 style={{ fontSize: '1rem', marginBottom: '0.35rem' }}>{recipe.name}</h4>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--primary)', marginBottom: '0.5rem' }}>
+                    {formatIdr(recipe.sellingPrice)}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>HPP: {formatIdr(hppDetails.hppPerUnit)}</span>
+                    <span style={{ color: isOutOfStock ? 'var(--accent-rose)' : 'var(--accent-emerald)', fontWeight: 700 }}>
+                      Stok: {recipe.finishedStock} {recipe.yieldUnit}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => addToCart(recipe.id)}
+                    className="btn btn-primary"
+                    disabled={isOutOfStock}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      fontSize: '0.85rem',
+                      background: isOutOfStock ? '#cbd5e1' : undefined
+                    }}
+                  >
+                    <Plus size={16} /> {isOutOfStock ? 'Stok Habis' : 'Tambah'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Right: Cart & Payment Checkout Sidebar */}
+      <div style={{ flex: '0 0 380px', minWidth: '320px' }}>
+        <div className="card" style={{ position: 'sticky', top: '1rem', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+            <h3 style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <ShoppingCart size={18} color="var(--primary)" /> Keranjang Kasir ({cartItems.reduce((s, i) => s + i.quantity, 0)})
+            </h3>
+            {cartItems.length > 0 && (
+              <button onClick={clearCart} style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}>
+                Kosongkan
+              </button>
+            )}
+          </div>
+
+          {/* Cart Items List */}
+          <div style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            {cartItems.length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                Keranjang masih kosong. Klik "+ Tambah" pada produk di sebelah kiri.
+              </div>
+            ) : (
+              cartItems.map(item => (
+                <div key={item.recipeId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem', background: '#f8fafc', borderRadius: 'var(--radius-sm)' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{item.recipeName}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {formatIdr(item.pricePerUnit)} x {item.quantity}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <button onClick={() => updateCartQty(item.recipeId, -1)} className="btn btn-outline" style={{ padding: '0.2rem 0.4rem' }}>
+                      <Minus size={12} />
+                    </button>
+                    <span style={{ fontWeight: 700, fontSize: '0.85rem', width: '20px', textAlign: 'center' }}>{item.quantity}</span>
+                    <button onClick={() => updateCartQty(item.recipeId, 1)} className="btn btn-outline" style={{ padding: '0.2rem 0.4rem' }}>
+                      <Plus size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Customer & Payment Form */}
+          {cartItems.length > 0 && (
+            <form onSubmit={handleCheckout} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: '0.75rem' }}>Nama Pelanggan (Opsional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Kak Andi"
+                  value={customerName}
+                  onChange={e => setCustomerName(e.target.value)}
+                  className="form-control"
+                  style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: '0.75rem' }}>Metode Pembayaran</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+                  {(['QRIS', 'Tunai', 'Transfer Bank', 'E-Wallet'] as const).map(method => (
+                    <button
+                      key={method}
+                      type="button"
+                      className={`btn ${paymentMethod === method ? 'btn-primary' : 'btn-outline'}`}
+                      style={{ padding: '0.35rem', fontSize: '0.75rem' }}
+                      onClick={() => setPaymentMethod(method)}
+                    >
+                      {method}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {paymentMethod === 'Tunai' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>Uang Diterima (Rp)</label>
+                    <input
+                      type="number"
+                      value={cashPaid || ''}
+                      onChange={e => setCashPaid(Number(e.target.value))}
+                      className="form-control"
+                      placeholder="Bayar"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>Kembalian</label>
+                    <div className="form-control" style={{ background: '#f8fafc', fontWeight: 800, color: 'var(--accent-emerald)' }}>
+                      {formatIdr(change)}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Real-time Transaction Profit Inspector Box */}
+              <div style={{ background: '#ecfdf5', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid #a7f3d0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#065f46' }}>
+                  <span>Subtotal:</span>
+                  <span>{formatIdr(cartSubtotal)}</span>
+                </div>
+                {taxAmount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#065f46' }}>
+                    <span>Pajak PB1 ({storeSettings.taxPercent}%):</span>
+                    <span>+{formatIdr(taxAmount)}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#065f46' }}>
+                  <span>Modal HPP:</span>
+                  <span>{formatIdr(cartTotalHpp)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 800, color: '#047857', marginTop: '0.25rem' }}>
+                  <span>Estimasi Laba Kotor:</span>
+                  <span>+{formatIdr(cartGrossProfit)}</span>
+                </div>
+              </div>
+
+              {/* Total & Checkout Button */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.25rem' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Total Bayar:</span>
+                <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--primary)' }}>
+                  {formatIdr(cartGrandTotal)}
+                </span>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-emerald"
+                style={{ padding: '0.75rem', fontSize: '1rem', width: '100%' }}
+              >
+                <CheckCircle size={18} /> Selesaikan Pesanan & Cetak Struk
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+
+      {/* Printable Receipt Modal */}
+      {completedSale && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '420px' }}>
+            <div className="modal-header">
+              <h3>Nota Struk Pembayaran</h3>
+              <button onClick={() => setCompletedSale(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="modal-body" id="printable-receipt">
+              <div style={{ textAlign: 'center', marginBottom: '1rem', borderBottom: '1px dashed #cbd5e1', paddingBottom: '0.75rem' }}>
+                <h2 style={{ fontSize: '1.25rem', marginBottom: '0.2rem' }}>{storeSettings.storeName}</h2>
+                <p style={{ fontSize: '0.75rem', margin: 0 }}>{storeSettings.address}</p>
+                <p style={{ fontSize: '0.75rem', margin: 0 }}>{completedSale.date} | {completedSale.invoiceNo}</p>
+                <p style={{ fontSize: '0.75rem', marginTop: '0.25rem', fontWeight: 600 }}>Pelanggan: {completedSale.customerName}</p>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem', borderBottom: '1px dashed #cbd5e1', paddingBottom: '0.75rem' }}>
+                {completedSale.items.map((item, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <div>
+                      <div>{item.recipeName}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{item.quantity} x {formatIdr(item.pricePerUnit)}</div>
+                    </div>
+                    <div style={{ fontWeight: 700 }}>{formatIdr(item.subtotal)}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.85rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Subtotal:</span>
+                  <span>{formatIdr(completedSale.subtotal)}</span>
+                </div>
+                {completedSale.taxAmount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Pajak PB1 ({storeSettings.taxPercent}%):</span>
+                    <span>+{formatIdr(completedSale.taxAmount)}</span>
+                  </div>
+                )}
+                {completedSale.discount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-rose)' }}>
+                    <span>Diskon:</span>
+                    <span>-{formatIdr(completedSale.discount)}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1.1rem', marginTop: '0.25rem' }}>
+                  <span>TOTAL:</span>
+                  <span>{formatIdr(completedSale.grandTotal)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                  <span>Metode Bayar:</span>
+                  <span>{completedSale.paymentMethod}</span>
+                </div>
+                {completedSale.paymentMethod === 'Tunai' && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                      <span>Tunai Diterima:</span>
+                      <span>{formatIdr(completedSale.cashPaid || 0)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 700 }}>
+                      <span>Kembalian:</span>
+                      <span>{formatIdr(completedSale.change || 0)}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div style={{ textAlign: 'center', marginTop: '1.5rem', paddingTop: '0.75rem', borderTop: '1px dashed #cbd5e1', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                *** {storeSettings.footerNote} ***
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" onClick={handleSendWhatsApp} className="btn btn-emerald" style={{ background: '#25D366' }}>
+                <Send size={16} /> WhatsApp Struk
+              </button>
+              <button type="button" onClick={() => window.print()} className="btn btn-primary">
+                <Printer size={16} /> Cetak Struk
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

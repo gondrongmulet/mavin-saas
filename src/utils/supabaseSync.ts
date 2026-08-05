@@ -13,36 +13,79 @@ const HEADERS = {
 // 1. Tenant Accounts Cloud Sync
 export async function syncCloudTenantsFetch(): Promise<TenantAccount[]> {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/tenant_accounts?select=*`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/tenants?select=*`, {
       method: 'GET',
       headers: HEADERS
     });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
-        localStorage.setItem('mavin_tenants_v5', JSON.stringify(data));
-        return data;
+        const formatted: TenantAccount[] = data.map((t: any) => ({
+          id: t.id || `TNT-${t.email}`,
+          storeName: t.store_name || t.storeName || 'Toko UMKM',
+          ownerName: t.owner_name || t.ownerName || 'Pemilik Toko',
+          email: t.email,
+          phone: t.phone || '',
+          plan: t.plan || 'Pro',
+          status: t.status || 'Aktif',
+          expiryDate: t.expiry_date || '2026-12-31',
+          monthlyFee: t.plan === 'Enterprise' ? 149000 : 69000,
+          outletCount: 1,
+          registerDate: t.created_at ? t.created_at.split('T')[0] : '2026-08-05'
+        }));
+        localStorage.setItem('mavin_tenants_v5', JSON.stringify(formatted));
+        return formatted;
       }
     }
   } catch (e) {
-    console.warn('Supabase cloud fetch fallback to local:', e);
+    console.warn('Supabase cloud fetch fallback:', e);
   }
+
   const saved = localStorage.getItem('mavin_tenants_v5');
+  const regUsersStr = localStorage.getItem('mavin_registered_users');
   let list: TenantAccount[] = saved ? JSON.parse(saved) : [];
-  return list.filter(t => 
-    t.email !== 'ahmad@kopisenja.id' && 
-    t.email !== 'ratna@rotijuara.id' && 
-    t.email !== 'hendra@geprek88.id' &&
-    t.email !== 'dewi@estehsolo.id'
-  );
+
+  if (regUsersStr) {
+    try {
+      const regUsers = JSON.parse(regUsersStr);
+      regUsers.forEach((u: any) => {
+        if (u.email && u.email !== 'admin@mavin.id' && !list.some(t => t.email.trim().toLowerCase() === u.email.trim().toLowerCase())) {
+          list.push({
+            id: `TNT-REG-${Date.now()}`,
+            storeName: u.storeName || 'Toko UMKM',
+            ownerName: u.ownerName || 'Pemilik Toko',
+            email: u.email,
+            phone: u.phone || '08123456789',
+            plan: 'Pro',
+            status: 'Aktif',
+            expiryDate: '2026-12-31',
+            monthlyFee: 69000,
+            outletCount: 1,
+            registerDate: new Date().toISOString().split('T')[0]
+          });
+        }
+      });
+    } catch (e) {}
+  }
+
+  return list;
 }
 
 export async function syncCloudTenantSave(tenant: TenantAccount): Promise<void> {
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/tenant_accounts`, {
+    const payload = {
+      store_name: tenant.storeName,
+      owner_name: tenant.ownerName,
+      email: tenant.email,
+      phone: tenant.phone,
+      plan: tenant.plan,
+      status: tenant.status
+    };
+
+    await fetch(`${SUPABASE_URL}/rest/v1/tenants`, {
       method: 'POST',
       headers: HEADERS,
-      body: JSON.stringify(tenant)
+      body: JSON.stringify(payload)
     });
   } catch (e) {
     console.warn('Supabase cloud save error:', e);

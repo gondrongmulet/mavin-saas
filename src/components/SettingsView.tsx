@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Store,
   MapPin,
@@ -23,7 +23,14 @@ import {
   ShoppingBag,
   Utensils,
   Upload,
-  Image as ImageIcon
+  Image as ImageIcon,
+  CreditCard,
+  QrCode,
+  Zap,
+  Clock,
+  Send,
+  RefreshCw,
+  Crown
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { UserRole, StaffUser } from '../types';
@@ -56,7 +63,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
     deleteStaffUser
   } = useApp();
 
-  const [activeSubTab, setActiveSubTab] = useState<'store' | 'outlets' | 'suppliers' | 'roles' | 'bep'>('store');
+  const [activeSubTab, setActiveSubTab] = useState<'store' | 'subscription' | 'outlets' | 'suppliers' | 'roles' | 'bep'>('store');
 
   // Store settings form state
   const [storeName, setStoreName] = useState(storeSettings.storeName);
@@ -74,6 +81,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
   const [primaryColor, setPrimaryColor] = useState(storeSettings.primaryColor || '#4f46e5');
   const [appBackground, setAppBackground] = useState(storeSettings.appBackground || 'slate');
 
+  // Subscription state
+  const [currentPlan, setCurrentPlan] = useState<'Starter' | 'Pro' | 'Enterprise'>('Pro');
+  const [subscriptionStatus, setSubscriptionStatus] = useState<'Trial' | 'Aktif' | 'Expired'>('Trial');
+  const [daysRemaining, setDaysRemaining] = useState(12);
+
+  // Upgrade Payment Modal state
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [targetUpgradePlan, setTargetUpgradePlan] = useState<'Pro' | 'Enterprise'>('Pro');
+  const [paymentMethodTab, setPaymentMethodTab] = useState<'qris' | 'bank'>('qris');
+  const [paymentStatus, setPaymentStatus] = useState<'waiting' | 'verifying' | 'success'>('waiting');
+  const [autoCheckSeconds, setAutoCheckSeconds] = useState(5);
+
   // Outlet modal
   const [isOutletModalOpen, setIsOutletModalOpen] = useState(false);
   const [editingOutletId, setEditingOutletId] = useState<string | null>(null);
@@ -87,9 +106,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
   const [supName, setSupName] = useState('');
   const [supPhone, setSupPhone] = useState('');
   const [supAddress, setSupAddress] = useState('');
-  const [supCategory, setSupCategory] = useState('Biji Kopi & Roastery');
+  const [supCategory, setSupCategory] = useState('');
 
-  // Staff User Modal State
+  // Staff User modal
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
   const [staffName, setStaffName] = useState('');
@@ -97,24 +116,33 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
   const [staffRole, setStaffRole] = useState<UserRole>('cashier');
   const [staffStatus, setStaffStatus] = useState<'Aktif' | 'Non-Aktif'>('Aktif');
 
-  // BEP Calculator State
-  const [bepFixedCosts, setBepFixedCosts] = useState({
-    labor: 5000000,
-    rent: 2000000,
-    utilities: 1000000,
-    marketing: 500000
-  });
+  // BEP Calculator state
+  const [bepFixedCostMonth, setBepFixedCostMonth] = useState(6500000);
   const [bepSellingPrice, setBepSellingPrice] = useState(22000);
-  const [bepHppPerUnit, setBepHppPerUnit] = useState(8500);
-  const [operatingDays, setOperatingDays] = useState(26);
+  const [bepHppPrice, setBepHppPrice] = useState(8500);
 
-  // File Upload Reader Handler
-  const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Simulated auto-polling timer for QRIS payment verification
+  useEffect(() => {
+    let interval: any;
+    if (isUpgradeModalOpen && paymentMethodTab === 'qris' && paymentStatus === 'waiting') {
+      interval = setInterval(() => {
+        setAutoCheckSeconds(prev => {
+          if (prev <= 1) {
+            return 5;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isUpgradeModalOpen, paymentMethodTab, paymentStatus]);
+
+  const handleCustomLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 3 * 1024 * 1024) {
-      alert('Ukuran file terlalu besar. Maksimal 3MB.');
+      alert('⚠️ Ukuran berkas logo terlalu besar. Maksimal 3MB.');
       return;
     }
 
@@ -147,53 +175,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
     alert('✅ Profil Toko & Tema Branding Aplikasi berhasil disimpan!');
   };
 
-  // Preset Color Palettes
-  const presetColors = [
-    { name: 'Indigo Enterprise', hex: '#4f46e5' },
-    { name: 'Emerald Fresh', hex: '#059669' },
-    { name: 'Warm Amber Coffee', hex: '#d97706' },
-    { name: 'Passion Rose', hex: '#e11d48' },
-    { name: 'Royal Purple', hex: '#7c3aed' },
-    { name: 'Slate Midnight', hex: '#334155' }
-  ];
-
-  const presetBackgrounds: { id: 'slate' | 'white' | 'cream' | 'mint' | 'sky'; name: string; hex: string }[] = [
-    { id: 'slate', name: 'Abu Slate Soft', hex: '#f1f5f9' },
-    { id: 'white', name: 'Putih Murni', hex: '#ffffff' },
-    { id: 'cream', name: 'Krem Warm Coffee', hex: '#fdfbf7' },
-    { id: 'mint', name: 'Hijau Mint Soft', hex: '#f0fdf4' },
-    { id: 'sky', name: 'Biru Soft Ice', hex: '#f0f9ff' }
-  ];
-
-  // Explicit demo role switch with clear intent
-  const handleSimulateRoleLogin = (role: UserRole) => {
-    if (confirm(`Apakah Anda ingin masuk dalam Mode Demo sebagai ${role === 'cashier' ? 'Kasir' : role === 'manager' ? 'Dapur' : 'Pemilik'}?\n\nAnda akan diarahkan ke halaman yang sesuai.`)) {
-      setCurrentRole(role);
-      if (role === 'cashier') setActiveTab('pos');
-      else if (role === 'manager') setActiveTab('recipes');
-      else setActiveTab('dashboard');
-    }
+  const handleOpenUpgradeModal = (plan: 'Pro' | 'Enterprise') => {
+    setTargetUpgradePlan(plan);
+    setPaymentMethodTab('qris');
+    setPaymentStatus('waiting');
+    setIsUpgradeModalOpen(true);
   };
 
-  // Staff Submit (Add / Edit)
-  const openAddStaffModal = () => {
-    setEditingStaffId(null);
-    setStaffName('');
-    setStaffEmail('');
-    setStaffRole('cashier');
-    setStaffStatus('Aktif');
-    setIsStaffModalOpen(true);
+  const handleSimulatePaymentSuccess = () => {
+    setPaymentStatus('verifying');
+    setTimeout(() => {
+      setPaymentStatus('success');
+      setCurrentPlan(targetUpgradePlan);
+      setSubscriptionStatus('Aktif');
+      setDaysRemaining(30);
+    }, 1500);
   };
 
-  const openEditStaffModal = (st: StaffUser) => {
-    setEditingStaffId(st.id);
-    setStaffName(st.name);
-    setStaffEmail(st.email);
-    setStaffRole(st.role);
-    setStaffStatus(st.status);
-    setIsStaffModalOpen(true);
+  const handleSendWhatsAppConfirmation = () => {
+    const msg = `Halo Admin MAVIN SaaS, saya ingin konfirmasi pembayaran upgrade Paket ${targetUpgradePlan} untuk toko: ${storeSettings.storeName} (${phone}). Tolong bantu verifikasi mas. Terimakasih!`;
+    const url = `https://wa.me/6281234567890?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
   };
 
+  // Staff Form Submits
   const handleStaffSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!staffName.trim()) return;
@@ -242,11 +247,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
     setIsSupModalOpen(false);
   };
 
-  // BEP Calculation Logic
-  const totalFixedCost = bepFixedCosts.labor + bepFixedCosts.rent + bepFixedCosts.utilities + bepFixedCosts.marketing;
-  const marginPerUnit = Math.max(1, bepSellingPrice - bepHppPerUnit);
-  const bepUnitsMonth = Math.ceil(totalFixedCost / marginPerUnit);
-  const bepUnitsDay = Math.ceil(bepUnitsMonth / operatingDays);
+  // BEP Calculations
+  const marginPerUnit = bepSellingPrice - bepHppPrice;
+  const bepUnitsMonth = marginPerUnit > 0 ? Math.ceil(bepFixedCostMonth / marginPerUnit) : 0;
+  const bepUnitsDay = Math.ceil(bepUnitsMonth / 30);
   const bepRevenueMonth = bepUnitsMonth * bepSellingPrice;
 
   // Modules list for Interactive RBAC matrix table
@@ -266,7 +270,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
       {/* Header */}
       <div>
         <h2>Pengaturan Enterprise MAVIN SaaS</h2>
-        <p style={{ fontSize: '0.875rem' }}>Kelola profil usaha, kustomisasi logo & tema tampilan, cabang outlet, data supplier, matrik RBAC, dan BEP.</p>
+        <p style={{ fontSize: '0.875rem' }}>Kelola profil usaha, status langganan & upgrade, kustomisasi logo & tema, cabang outlet, data supplier, matrik RBAC, dan BEP.</p>
       </div>
 
       {/* Sub Tabs Bar - Styled Modern Pills */}
@@ -277,6 +281,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
           className={`sub-tab-pill ${activeSubTab === 'store' ? 'active' : ''}`}
         >
           <Building size={16} /> Profil Toko & Tema Branding
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('subscription')}
+          className={`sub-tab-pill ${activeSubTab === 'subscription' ? 'active' : ''}`}
+        >
+          <CreditCard size={16} /> Langganan & Upgrade
         </button>
         <button
           type="button"
@@ -308,16 +319,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
         </button>
       </div>
 
-      {/* TAB 1: Store & Tax Settings + White-Label Branding Customization */}
+      {/* 1. SUB-TAB: PROFIL TOKO & TEMA BRANDING */}
       {activeSubTab === 'store' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1.5rem' }}>
-          {/* Form Settings */}
+        <form onSubmit={handleSaveStore} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Information Card */}
           <div className="card">
-            <h3 style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Building size={20} color="var(--primary)" /> Informasi Profil Usaha Toko
-            </h3>
+            <h3>Profil Usaha & Informasi Struk Nota</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+              Informasi ini akan tercetak pada nota pembelian kasir POS dan pesan WhatsApp struk pelanggan.
+            </p>
 
-            <form onSubmit={handleSaveStore} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
               <div className="form-group">
                 <label className="form-label">Nama Usaha / Toko *</label>
                 <input
@@ -330,332 +342,246 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Slogan / Tagline Usaha</label>
+                <label className="form-label">Slogan / Tagline</label>
                 <input
                   type="text"
                   value={tagline}
                   onChange={e => setTagline(e.target.value)}
                   className="form-control"
+                  placeholder="e.g. Kopi & Roti Bakar Kekinian"
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="form-group">
-                  <label className="form-label">Alamat Utama Usaha</label>
-                  <input
-                    type="text"
-                    value={address}
-                    onChange={e => setAddress(e.target.value)}
-                    className="form-control"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Nomor WhatsApp Toko</label>
-                  <input
-                    type="text"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    className="form-control"
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="form-group">
-                  <label className="form-label">Pajak PB1 (%)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="30"
-                    value={taxPercent}
-                    onChange={e => setTaxPercent(Number(e.target.value))}
-                    className="form-control"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Service Charge (%)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="20"
-                    value={servicePercent}
-                    onChange={e => setServicePercent(Number(e.target.value))}
-                    className="form-control"
-                  />
-                </div>
-              </div>
-
               <div className="form-group">
-                <label className="form-label">Pesan Footer Struk Nota</label>
-                <textarea
-                  rows={2}
-                  value={footerNote}
-                  onChange={e => setFooterNote(e.target.value)}
+                <label className="form-label">Alamat Usaha</label>
+                <input
+                  type="text"
+                  value={address}
+                  onChange={e => setAddress(e.target.value)}
                   className="form-control"
                 />
               </div>
 
-              <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start', marginTop: '0.5rem' }}>
-                <CheckCircle2 size={16} /> Simpan Profil & Branding Toko
-              </button>
-            </form>
+              <div className="form-group">
+                <label className="form-label">Nomor Kontak WhatsApp / Telp</label>
+                <input
+                  type="text"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  className="form-control"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Pajak Resto (PB1 / PPN) %</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="50"
+                  value={taxPercent}
+                  onChange={e => setTaxPercent(Number(e.target.value))}
+                  className="form-control"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Biaya Layanan (Service Charge) %</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="50"
+                  value={servicePercent}
+                  onChange={e => setServicePercent(Number(e.target.value))}
+                  className="form-control"
+                />
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginTop: '0.5rem' }}>
+              <label className="form-label">Pesan Catatan Kaki Nota (Footer Note)</label>
+              <textarea
+                rows={2}
+                value={footerNote}
+                onChange={e => setFooterNote(e.target.value)}
+                className="form-control"
+                placeholder="Terima kasih atas kunjungan Anda! Follow IG @kopisususenja"
+              />
+            </div>
           </div>
 
-          {/* White-Label Branding & Theme Customizer */}
-          <div className="card" style={{ background: '#f8fafc', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2rem', fontWeight: 800 }}>
+              Simpan Pengaturan Profil Toko
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* 2. SUB-TAB: INFORMASI LANGGANAN & UPGRADE */}
+      {activeSubTab === 'subscription' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Active Subscription Banner */}
+          <div style={{
+            background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '2rem',
+            color: 'white',
+            boxShadow: 'var(--shadow-xl)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
             <div>
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)', marginBottom: '0.35rem' }}>
-                <Palette size={20} /> Kustomisasi Tema & Logo Aplikasi (White-Labeling)
-              </h3>
-              <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>
-                Upload gambar logo kustom usaha Anda atau pilih ikon bawaan, sesuaikan warna brand & background aplikasi!
+              <span className="badge badge-amber" style={{ marginBottom: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                <Zap size={14} /> INFORMASI LANGGANAN AKTIF
+              </span>
+              <h2 style={{ color: 'white', fontSize: '1.8rem', marginBottom: '0.35rem' }}>
+                Paket {currentPlan} ({subscriptionStatus === 'Trial' ? 'Instant Trial 14 Hari' : 'Aktif Berlangganan'})
+              </h2>
+              <p style={{ color: '#c7d2fe', fontSize: '0.95rem', maxWidth: '650px' }}>
+                {subscriptionStatus === 'Trial'
+                  ? `Masa trial gratis Anda tersisa ${daysRemaining} Hari. Setelah trial selesai, akun Anda otomatis beralih ke Paket Starter (Gratis Selamanya dengan pembatasan 1 Outlet & 5 Resep).`
+                  : 'Akun Anda menikmati seluruh fitur unlimited MAVIN SaaS.'}
               </p>
             </div>
 
-            {/* 1. Logo Selector Tabs (Preset vs Upload Custom) */}
-            <div>
-              <label className="form-label" style={{ marginBottom: '0.5rem', display: 'block' }}>Logo Toko (Upload File / Preset):</label>
-              
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.85rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setLogoType('preset')}
-                  className={`btn ${logoType === 'preset' ? 'btn-primary' : 'btn-outline'}`}
-                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                >
-                  <Award size={14} /> Pilihan Ikon Preset
-                </button>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '0.8rem', color: '#a5b4fc', fontWeight: 700 }}>STATUS MASA AKTIF:</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#38bdf8', margin: '0.2rem 0' }}>
+                {daysRemaining} Hari Tersisa
+              </div>
+              <button
+                onClick={() => handleOpenUpgradeModal('Pro')}
+                className="btn btn-emerald"
+                style={{ padding: '0.6rem 1.25rem', fontWeight: 800, fontSize: '0.85rem' }}
+              >
+                <Zap size={16} /> Upgrade Paket Sekarang
+              </button>
+            </div>
+          </div>
 
-                <button
-                  type="button"
-                  onClick={() => setLogoType('custom')}
-                  className={`btn ${logoType === 'custom' ? 'btn-primary' : 'btn-outline'}`}
-                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                >
-                  <Upload size={14} /> Upload Gambar Logo
-                </button>
+          {/* Pricing Upgrade Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: '1.5rem' }}>
+            {/* Starter Plan */}
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div>
+                <span className="badge badge-emerald" style={{ marginBottom: '0.5rem' }}>🎁 Starter (Gratis Selamanya)</span>
+                <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Rp 0 <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)' }}>/ selamanya</span></h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>Otomatis aktif setelah Trial 14 Hari selesai jika tidak upgrade.</p>
+
+                <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.875rem' }}>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Check size={16} color="#16a34a" /> 1 Outlet Cabang</li>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Check size={16} color="#16a34a" /> Hingga 5 Resep Menu</li>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Check size={16} color="#16a34a" /> POS Kasir Dasar</li>
+                </ul>
               </div>
 
-              {/* Mode A: Preset Icons */}
-              {logoType === 'preset' && (
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {[
-                    { id: 'Award', label: 'Medal', icon: <Award size={18} /> },
-                    { id: 'Coffee', label: 'Kopi', icon: <Coffee size={18} /> },
-                    { id: 'ChefHat', label: 'Chef', icon: <ChefHat size={18} /> },
-                    { id: 'Store', label: 'Toko', icon: <Store size={18} /> },
-                    { id: 'ShoppingBag', label: 'Bag', icon: <ShoppingBag size={18} /> },
-                    { id: 'Utensils', label: 'Resto', icon: <Utensils size={18} /> }
-                  ].map(item => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setLogoIcon(item.id as any)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.35rem',
-                        padding: '0.4rem 0.65rem',
-                        borderRadius: 'var(--radius-sm)',
-                        border: logoIcon === item.id ? `2px solid ${primaryColor}` : '1px solid var(--border-color)',
-                        background: logoIcon === item.id ? '#ffffff' : '#f1f5f9',
-                        color: logoIcon === item.id ? primaryColor : 'var(--text-muted)',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        fontSize: '0.78rem'
-                      }}
-                    >
-                      {item.icon} {item.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Mode B: Custom File Upload */}
-              {logoType === 'custom' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', background: '#ffffff', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                    <label
-                      htmlFor="logo-file-input"
-                      className="btn btn-emerald"
-                      style={{ cursor: 'pointer', fontSize: '0.8rem', padding: '0.45rem 0.85rem' }}
-                    >
-                      <Upload size={14} /> Pilih File Gambar...
-                    </label>
-                    <input
-                      id="logo-file-input"
-                      type="file"
-                      accept="image/png, image/jpeg, image/webp, image/svg+xml"
-                      onChange={handleLogoFileUpload}
-                      style={{ display: 'none' }}
-                    />
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Format: PNG, JPG, SVG (Maks 3MB)</span>
-                  </div>
-
-                  {/* Custom URL text fallback */}
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>atau Masukkan Direct Image URL (HTTPS):</label>
-                    <input
-                      type="text"
-                      placeholder="https://domain.com/logo.png"
-                      value={customLogoUrl}
-                      onChange={e => setCustomLogoUrl(e.target.value)}
-                      className="form-control"
-                      style={{ fontSize: '0.8rem', padding: '0.4rem 0.65rem' }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* 2. Primary Color Picker */}
-            <div>
-              <label className="form-label" style={{ marginBottom: '0.5rem', display: 'block' }}>Pilih Warna Tema Utama Usaha (Brand Color):</label>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.5rem' }}>
-                {presetColors.map(c => (
-                  <button
-                    key={c.hex}
-                    type="button"
-                    onClick={() => setPrimaryColor(c.hex)}
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
-                      background: c.hex,
-                      border: primaryColor === c.hex ? '3px solid #0f172a' : '2px solid #ffffff',
-                      boxShadow: '0 2px 5px rgba(0,0,0,0.15)',
-                      cursor: 'pointer',
-                      transition: 'transform 0.15s ease'
-                    }}
-                    title={c.name}
-                  />
-                ))}
-
-                {/* Custom Picker */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginLeft: '0.5rem' }}>
-                  <input
-                    type="color"
-                    value={primaryColor}
-                    onChange={e => setPrimaryColor(e.target.value)}
-                    style={{ width: '32px', height: '32px', border: 'none', background: 'none', cursor: 'pointer' }}
-                  />
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{primaryColor}</span>
-                </div>
+              <div style={{ marginTop: '1.5rem', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', background: '#f8fafc', padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}>
+                Status: Paket Fallback Otomatis
               </div>
             </div>
 
-            {/* 3. Background Theme Picker */}
-            <div>
-              <label className="form-label" style={{ marginBottom: '0.5rem', display: 'block' }}>Pilih Warna Background Aplikasi:</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.5rem' }}>
-                {presetBackgrounds.map(bg => (
-                  <button
-                    key={bg.id}
-                    type="button"
-                    onClick={() => setAppBackground(bg.id)}
-                    style={{
-                      padding: '0.5rem',
-                      borderRadius: 'var(--radius-sm)',
-                      border: appBackground === bg.id ? `2px solid ${primaryColor}` : '1px solid var(--border-color)',
-                      background: bg.hex,
-                      color: '#0f172a',
-                      fontWeight: appBackground === bg.id ? 800 : 600,
-                      fontSize: '0.78rem',
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-                    }}
-                  >
-                    {bg.name}
-                  </button>
-                ))}
+            {/* PRO Plan */}
+            <div className="card" style={{ border: '2px solid var(--primary)', position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: 'var(--shadow-lg)' }}>
+              <span style={{ position: 'absolute', top: '-12px', right: '20px', background: 'var(--primary)', color: 'white', padding: '0.2rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
+                REKOMENDASI
+              </span>
+
+              <div>
+                <span className="badge badge-indigo" style={{ marginBottom: '0.5rem' }}>⚡ Paket PRO</span>
+                <h3 style={{ fontSize: '1.8rem', color: 'var(--primary)', marginBottom: '0.5rem' }}>Rp 69.000 <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)' }}>/ bulan</span></h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>Bebas kelola resep & HPP unlimited tanpa batasan.</p>
+
+                <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.875rem' }}>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Check size={16} color="#16a34a" /> <strong>Multi-Outlet (Hingga 3 Cabang)</strong></li>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Check size={16} color="#16a34a" /> <strong>Resep & HPP WAC Otomatis Unlimited</strong></li>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Check size={16} color="#16a34a" /> <strong>Produksi Batch Dapur</strong></li>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Check size={16} color="#16a34a" /> <strong>POS Kasir & WA Direct Struk</strong></li>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Check size={16} color="#16a34a" /> <strong>Matriks Hak Akses RBAC Staf</strong></li>
+                </ul>
               </div>
+
+              <button
+                onClick={() => handleOpenUpgradeModal('Pro')}
+                className="btn btn-primary"
+                style={{ marginTop: '1.5rem', width: '100%', fontWeight: 800 }}
+              >
+                Upgrade ke Paket PRO (Rp 69rb)
+              </button>
             </div>
 
-            {/* Live Preview Card */}
-            <div style={{ marginTop: '0.5rem', padding: '1rem', background: '#ffffff', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '0.5rem' }}>PREVIEW TAMPILAN BRANDING ANDA:</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: primaryColor, color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                  {logoType === 'custom' && customLogoUrl ? (
-                    <img src={customLogoUrl} alt="Preview Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <>
-                      {logoIcon === 'Coffee' && <Coffee size={22} />}
-                      {logoIcon === 'ChefHat' && <ChefHat size={22} />}
-                      {logoIcon === 'Store' && <Store size={22} />}
-                      {logoIcon === 'ShoppingBag' && <ShoppingBag size={22} />}
-                      {logoIcon === 'Utensils' && <Utensils size={22} />}
-                      {logoIcon === 'Award' && <Award size={22} />}
-                    </>
-                  )}
-                </div>
-                <div>
-                  <h4 style={{ color: primaryColor, fontSize: '1.05rem', margin: 0 }}>{storeName}</h4>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{tagline || 'Manajemen UMKM Juara'}</span>
-                </div>
+            {/* Enterprise Plan */}
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div>
+                <span className="badge badge-amber" style={{ marginBottom: '0.5rem' }}>🏆 Enterprise</span>
+                <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Rp 149.000 <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)' }}>/ bulan</span></h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>Untuk usaha cabang franchise & skala besar.</p>
+
+                <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.875rem' }}>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Check size={16} color="#16a34a" /> Cabang Outlet Unlimited</li>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Check size={16} color="#16a34a" /> Custom White-Label Logo & Warna</li>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Check size={16} color="#16a34a" /> Priority Support WA 24/7</li>
+                </ul>
               </div>
+
+              <button
+                onClick={() => handleOpenUpgradeModal('Enterprise')}
+                className="btn btn-outline"
+                style={{ marginTop: '1.5rem', width: '100%', fontWeight: 700 }}
+              >
+                Upgrade Enterprise (Rp 149rb)
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* TAB 4: User & Role RBAC Matrix (INTERACTIVE & EDITABLE) */}
+      {/* 3. SUB-TAB: MATRIKS PERAN & RBAC */}
       {activeSubTab === 'roles' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
-          {/* Section 1: Staff User Accounts Management */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-              <div>
-                <h3>Manajemen Pengguna & Pengelola Usaha ({staffUsers.length} Akun)</h3>
-                <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>Daftar staf, kasir, dan pengelola usaha serta alokasi hak akses masing-masing.</p>
-              </div>
-              <button onClick={openAddStaffModal} className="btn btn-primary">
-                <Plus size={16} /> Tambah Akun Staf Baru
-              </button>
-            </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="card">
+            <h3>Dokumen Matriks Hak Akses Peran (RBAC)</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+              Atur dan ubah izin akses tiap modul aplikasi untuk <strong>Staf Dapur</strong> dan <strong>Staf Kasir</strong> secara interaktif di bawah ini:
+            </p>
 
             <div className="table-container">
-              <table className="custom-table">
+              <table>
                 <thead>
                   <tr>
-                    <th>Nama Pengguna</th>
-                    <th>Email Login</th>
-                    <th>Hak Akses Peran (Role)</th>
-                    <th>Cabang Outlet</th>
-                    <th>Status</th>
-                    <th style={{ textAlign: 'right' }}>Aksi</th>
+                    <th>MODUL & FITUR APLIKASI</th>
+                    <th style={{ textAlign: 'center' }}>👑 PEMILIK TOKO</th>
+                    <th style={{ textAlign: 'center' }}>👨‍🍳 STAF DAPUR</th>
+                    <th style={{ textAlign: 'center' }}>🛒 STAF KASIR</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {staffUsers.map(st => (
-                    <tr key={st.id}>
-                      <td><strong style={{ color: 'var(--text-main)' }}>{st.name}</strong></td>
-                      <td style={{ color: 'var(--text-muted)' }}>{st.email}</td>
+                  {modulesList.map(mod => (
+                    <tr key={mod.key}>
                       <td>
-                        {st.role === 'owner' && <span className="badge badge-amber">👑 Pemilik (Super Admin)</span>}
-                        {st.role === 'manager' && <span className="badge badge-indigo">👨‍🍳 Dapur & Operasional</span>}
-                        {st.role === 'cashier' && <span className="badge badge-emerald">🛒 Kasir (POS)</span>}
+                        <div style={{ fontWeight: 700 }}>{mod.name}</div>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{mod.description}</span>
                       </td>
-                      <td>{st.outletName}</td>
-                      <td>
-                        <span className={`badge ${st.status === 'Aktif' ? 'badge-emerald' : 'badge-rose'}`}>
-                          {st.status}
-                        </span>
+                      <td style={{ textAlign: 'center' }}>
+                        <span className="badge badge-emerald"><Check size={14} /> Akses Penuh</span>
                       </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
-                          <button onClick={() => openEditStaffModal(st)} className="btn btn-outline" style={{ padding: '0.3rem 0.5rem' }} title="Edit Staf">
-                            <Edit2 size={14} /> Edit
-                          </button>
-                          {st.role !== 'owner' && (
-                            <button onClick={() => deleteStaffUser(st.id)} className="btn btn-danger" style={{ padding: '0.3rem 0.5rem' }} title="Hapus Staf">
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                        </div>
+                      <td style={{ textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(rolePermissions.manager[mod.key])}
+                          onChange={e => updateRolePermission('manager', mod.key, e.target.checked)}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+                        />
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(rolePermissions.cashier[mod.key])}
+                          onChange={e => updateRolePermission('cashier', mod.key, e.target.checked)}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+                        />
                       </td>
                     </tr>
                   ))}
@@ -663,274 +589,49 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
               </table>
             </div>
           </div>
-
-          {/* Section 2: FULLY INTERACTIVE & EDITABLE RBAC PERMISSION MATRIX */}
-          <div className="card" style={{ padding: '1.5rem', background: '#ffffff', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-              <div>
-                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)' }}>
-                  <ShieldCheck size={22} /> Matriks Hak Akses Peran (Interaktif & Dapat Diedit)
-                </h3>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  Centang atau hilangkan centang pada sakelar modul di bawah ini untuk mengatur izin akses <strong>Dapur</strong> & <strong>Kasir</strong> secara langsung!
-                </p>
-              </div>
-
-              <span className="badge badge-indigo" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}>
-                <Sparkles size={14} /> Realtime Auto-Save
-              </span>
-            </div>
-
-            <div className="table-container">
-              <table className="custom-table">
-                <thead>
-                  <tr>
-                    <th>Modul Fitur MAVIN</th>
-                    <th style={{ textAlign: 'center', width: '220px' }}>👑 PEMILIK (OWNER)</th>
-                    <th style={{ textAlign: 'center', width: '240px' }}>👨‍🍳 DAPUR & OPS</th>
-                    <th style={{ textAlign: 'center', width: '240px' }}>🛒 KASIR (CASHIER)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {modulesList.map(mod => {
-                    const isManagerAllowed = Boolean(rolePermissions.manager?.[mod.key]);
-                    const isCashierAllowed = Boolean(rolePermissions.cashier?.[mod.key]);
-
-                    return (
-                      <tr key={mod.key}>
-                        <td>
-                          <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{mod.name}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{mod.description}</div>
-                        </td>
-
-                        {/* Owner Column - Always Locked ON */}
-                        <td style={{ textAlign: 'center', background: '#fefce8' }}>
-                          <span className="badge badge-amber" style={{ padding: '0.35rem 0.65rem' }}>
-                            <Lock size={12} /> Akses Penuh
-                          </span>
-                        </td>
-
-                        {/* Manager / Dapur Column - INTERACTIVE CHECKBOX */}
-                        <td style={{ textAlign: 'center' }}>
-                          <label
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.5rem',
-                              cursor: 'pointer',
-                              padding: '0.4rem 0.8rem',
-                              borderRadius: 'var(--radius-sm)',
-                              background: isManagerAllowed ? '#ecfdf5' : '#fff1f2',
-                              border: `1px solid ${isManagerAllowed ? '#a7f3d0' : '#fecdd3'}`,
-                              transition: 'all 0.2s ease',
-                              userSelect: 'none'
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isManagerAllowed}
-                              onChange={e => updateRolePermission('manager', mod.key, e.target.checked)}
-                              style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent-emerald)' }}
-                            />
-                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: isManagerAllowed ? '#047857' : '#be123c' }}>
-                              {isManagerAllowed ? 'Dizinkan' : 'Terkunci'}
-                            </span>
-                          </label>
-                        </td>
-
-                        {/* Cashier Column - INTERACTIVE CHECKBOX */}
-                        <td style={{ textAlign: 'center' }}>
-                          <label
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.5rem',
-                              cursor: 'pointer',
-                              padding: '0.4rem 0.8rem',
-                              borderRadius: 'var(--radius-sm)',
-                              background: isCashierAllowed ? '#ecfdf5' : '#fff1f2',
-                              border: `1px solid ${isCashierAllowed ? '#a7f3d0' : '#fecdd3'}`,
-                              transition: 'all 0.2s ease',
-                              userSelect: 'none'
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isCashierAllowed}
-                              onChange={e => updateRolePermission('cashier', mod.key, e.target.checked)}
-                              style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent-emerald)' }}
-                            />
-                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: isCashierAllowed ? '#047857' : '#be123c' }}>
-                              {isCashierAllowed ? 'Dizinkan' : 'Terkunci'}
-                            </span>
-                          </label>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Section 3: Explicit Role Simulation Tester */}
-          <div className="card" style={{ background: '#f8fafc', border: '1px solid var(--border-color)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              <Info size={18} color="var(--primary)" />
-              <h4 style={{ fontSize: '0.95rem' }}>Simulasi Pengujian Login Role (Demo Mode)</h4>
-            </div>
-            <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-              Ubah hak akses di atas lalu klik tombol simulasi untuk melihat perubahan navigasi saat login sebagai staf Dapur atau Kasir:
-            </p>
-
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => handleSimulateRoleLogin('manager')}
-              >
-                👨‍🍳 Uji Tampilan Role Dapur
-              </button>
-
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => handleSimulateRoleLogin('cashier')}
-              >
-                🛒 Uji Tampilan Role Kasir
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
-      {/* TAB 2: Multi-Outlet Management */}
+      {/* 4. SUB-TAB: MULTI-OUTLET */}
       {activeSubTab === 'outlets' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>Daftar Cabang / Outlet ({outlets.length})</h3>
-            <button
-              onClick={() => {
-                setEditingOutletId(null);
-                setOutletName('');
-                setOutletAddress('');
-                setOutletPhone('');
-                setIsOutletModalOpen(true);
-              }}
-              className="btn btn-primary"
-            >
-              <Plus size={16} /> Tambah Cabang Baru
-            </button>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-            {outlets.map(out => (
-              <div key={out.id} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '0.75rem' }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <h4 style={{ fontSize: '1.05rem' }}>{out.name}</h4>
-                    {out.isMain ? (
-                      <span className="badge badge-emerald">Pusat / Main</span>
-                    ) : (
-                      <span className="badge badge-indigo">Cabang</span>
-                    )}
-                  </div>
-                  <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>📍 {out.address || 'Alamat belum disetting'}</p>
-                  <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>📞 {out.phone || '-'}</p>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem' }}>
-                  <button
-                    onClick={() => {
-                      setEditingOutletId(out.id);
-                      setOutletName(out.name);
-                      setOutletAddress(out.address);
-                      setOutletPhone(out.phone);
-                      setIsOutletModalOpen(true);
-                    }}
-                    className="btn btn-outline"
-                    style={{ padding: '0.3rem 0.5rem' }}
-                  >
-                    <Edit2 size={14} />
-                  </button>
-                  {!out.isMain && (
-                    <button
-                      onClick={() => deleteOutlet(out.id)}
-                      className="btn btn-danger"
-                      style={{ padding: '0.3rem 0.5rem' }}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: Master Supplier */}
-      {activeSubTab === 'suppliers' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>Master Data Supplier / Pemasok Bahan ({suppliers.length})</h3>
-            <button
-              onClick={() => {
-                setEditingSupId(null);
-                setSupName('');
-                setSupPhone('');
-                setSupAddress('');
-                setSupCategory('Biji Kopi & Roastery');
-                setIsSupModalOpen(true);
-              }}
-              className="btn btn-emerald"
-            >
-              <Plus size={16} /> Tambah Supplier Baru
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+            <div>
+              <h3>Daftar Cabang Outlet Usaha</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Kelola cabang outlet toko Anda.</p>
+            </div>
+            <button onClick={() => { setEditingOutletId(null); setOutletName(''); setOutletAddress(''); setOutletPhone(''); setIsOutletModalOpen(true); }} className="btn btn-primary">
+              <Plus size={16} /> Tambah Outlet Baru
             </button>
           </div>
 
           <div className="table-container">
-            <table className="custom-table">
+            <table>
               <thead>
                 <tr>
-                  <th>Nama Supplier</th>
-                  <th>Kategori Pasokan</th>
-                  <th>Telepon / WhatsApp</th>
-                  <th>Alamat</th>
-                  <th style={{ textAlign: 'right' }}>Aksi</th>
+                  <th>NAMA OUTLET</th>
+                  <th>ALAMAT</th>
+                  <th>TELEPON</th>
+                  <th>STATUS</th>
+                  <th>AKSI</th>
                 </tr>
               </thead>
               <tbody>
-                {suppliers.map(sup => (
-                  <tr key={sup.id}>
-                    <td><strong style={{ color: 'var(--primary)' }}>{sup.name}</strong></td>
-                    <td><span className="badge badge-indigo">{sup.category}</span></td>
-                    <td>{sup.phone}</td>
-                    <td style={{ color: 'var(--text-muted)' }}>{sup.address}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
-                        <button
-                          onClick={() => {
-                            setEditingSupId(sup.id);
-                            setSupName(sup.name);
-                            setSupPhone(sup.phone);
-                            setSupAddress(sup.address);
-                            setSupCategory(sup.category);
-                            setIsSupModalOpen(true);
-                          }}
-                          className="btn btn-outline"
-                          style={{ padding: '0.3rem 0.5rem' }}
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        <button
-                          onClick={() => deleteSupplier(sup.id)}
-                          className="btn btn-danger"
-                          style={{ padding: '0.3rem 0.5rem' }}
-                        >
+                {outlets.map(out => (
+                  <tr key={out.id}>
+                    <td style={{ fontWeight: 700 }}>{out.name} {out.isMain && <span className="badge badge-indigo">Utama</span>}</td>
+                    <td>{out.address}</td>
+                    <td>{out.phone}</td>
+                    <td><span className="badge badge-emerald">Aktif</span></td>
+                    <td>
+                      <button onClick={() => { setEditingOutletId(out.id); setOutletName(out.name); setOutletAddress(out.address); setOutletPhone(out.phone); setIsOutletModalOpen(true); }} className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', marginRight: '0.35rem' }}>
+                        <Edit2 size={14} />
+                      </button>
+                      {!out.isMain && (
+                        <button onClick={() => deleteOutlet(out.id)} className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', color: 'var(--accent-rose)' }}>
                           <Trash2 size={14} />
                         </button>
-                      </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -940,238 +641,280 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
         </div>
       )}
 
-      {/* TAB 5: BEP Calculator */}
-      {activeSubTab === 'bep' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem' }}>
-          {/* Left: Operational Inputs */}
-          <div className="card">
-            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Calculator size={20} color="var(--primary)" /> Biaya Operasional Tetap Bulanan
-            </h3>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Gaji Pegawai / Karyawan (Rp/bln)</label>
-                <input
-                  type="number"
-                  step="100000"
-                  value={bepFixedCosts.labor}
-                  onChange={e => setBepFixedCosts({ ...bepFixedCosts, labor: Number(e.target.value) })}
-                  className="form-control"
-                />
-              </div>
-
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Sewa Tempat / Outlet (Rp/bln)</label>
-                <input
-                  type="number"
-                  step="100000"
-                  value={bepFixedCosts.rent}
-                  onChange={e => setBepFixedCosts({ ...bepFixedCosts, rent: Number(e.target.value) })}
-                  className="form-control"
-                />
-              </div>
-
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Listrik, Air, Es & Wifi (Rp/bln)</label>
-                <input
-                  type="number"
-                  step="50000"
-                  value={bepFixedCosts.utilities}
-                  onChange={e => setBepFixedCosts({ ...bepFixedCosts, utilities: Number(e.target.value) })}
-                  className="form-control"
-                />
-              </div>
-
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Promosi & Marketing Ads (Rp/bln)</label>
-                <input
-                  type="number"
-                  step="50000"
-                  value={bepFixedCosts.marketing}
-                  onChange={e => setBepFixedCosts({ ...bepFixedCosts, marketing: Number(e.target.value) })}
-                  className="form-control"
-                />
-              </div>
-
-              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem', marginTop: '0.25rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Rata-rata Harga Jual</label>
-                    <input
-                      type="number"
-                      step="500"
-                      value={bepSellingPrice}
-                      onChange={e => setBepSellingPrice(Number(e.target.value))}
-                      className="form-control"
-                    />
-                  </div>
-
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Rata-rata HPP per Unit</label>
-                    <input
-                      type="number"
-                      step="500"
-                      value={bepHppPerUnit}
-                      onChange={e => setBepHppPerUnit(Number(e.target.value))}
-                      className="form-control"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Results Breakdown */}
-          <div className="card" style={{ background: '#f8fafc', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+      {/* 5. SUB-TAB: MASTER SUPPLIER */}
+      {activeSubTab === 'suppliers' && (
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
             <div>
-              <h3 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>Hasil Target Titik Impas (BEP)</h3>
-              <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-                Jumlah porsi minimum yang harus terjual untuk menutup seluruh operasional toko:
-              </p>
+              <h3>Master Data Supplier / Pemasok Bahan</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Daftar pemasok bahan baku untuk pencatatan kulakan.</p>
+            </div>
+            <button onClick={() => { setEditingSupId(null); setSupName(''); setSupPhone(''); setSupAddress(''); setSupCategory(''); setIsSupModalOpen(true); }} className="btn btn-primary">
+              <Plus size={16} /> Tambah Supplier
+            </button>
+          </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ background: 'white', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>TOTAL BIAYA TETAP BULANAN</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-rose)' }}>
-                    {formatIdr(totalFixedCost)}
-                  </div>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>NAMA SUPPLIER</th>
+                  <th>KATEGORI</th>
+                  <th>TELEPON / WA</th>
+                  <th>ALAMAT</th>
+                  <th>AKSI</th>
+                </tr>
+              </thead>
+              <tbody>
+                {suppliers.map(sup => (
+                  <tr key={sup.id}>
+                    <td style={{ fontWeight: 700 }}>{sup.name}</td>
+                    <td><span className="badge badge-indigo">{sup.category}</span></td>
+                    <td>{sup.phone}</td>
+                    <td>{sup.address}</td>
+                    <td>
+                      <button onClick={() => { setEditingSupId(sup.id); setSupName(sup.name); setSupPhone(sup.phone); setSupAddress(sup.address); setSupCategory(sup.category); setIsSupModalOpen(true); }} className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', marginRight: '0.35rem' }}>
+                        <Edit2 size={14} />
+                      </button>
+                      <button onClick={() => deleteSupplier(sup.id)} className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', color: 'var(--accent-rose)' }}>
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* 6. SUB-TAB: KALKULATOR BEP */}
+      {activeSubTab === 'bep' && (
+        <div className="card">
+          <h3>Kalkulator Target Break Even Point (BEP)</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+            Hitung berapa minimum porsi produk yang wajib terjual per hari agar toko tidak mengalami kerugian operasional.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Total Biaya Operasional Tetap (Fixed Cost / Bulan)</label>
+                <input
+                  type="number"
+                  value={bepFixedCostMonth}
+                  onChange={e => setBepFixedCostMonth(Number(e.target.value))}
+                  className="form-control"
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Harga Jual Rata-rata per Porsi / Cup (Rp)</label>
+                <input
+                  type="number"
+                  value={bepSellingPrice}
+                  onChange={e => setBepSellingPrice(Number(e.target.value))}
+                  className="form-control"
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">HPP Rata-rata per Porsi / Cup (Rp)</label>
+                <input
+                  type="number"
+                  value={bepHppPrice}
+                  onChange={e => setBepHppPrice(Number(e.target.value))}
+                  className="form-control"
+                />
+              </div>
+            </div>
+
+            <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700 }}>TARGET MINIMUM PENJUALAN BEP:</span>
+                <div style={{ fontSize: '2.2rem', fontWeight: 800, color: 'var(--primary)', margin: '0.2rem 0 1rem 0' }}>
+                  {formatNumber(bepUnitsDay)} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-muted)' }}>porsi / hari</span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div style={{ background: 'white', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>BEP TARGET BULANAN</span>
-                    <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--primary)' }}>
-                      {formatNumber(bepUnitsMonth)} <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>unit</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                  <div style={{ background: 'white', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>TARGET BULANAN</span>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-emerald)' }}>
+                      {formatNumber(bepUnitsMonth)} Porsi
                     </div>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Omset: {formatIdr(bepRevenueMonth)}</span>
                   </div>
 
-                  <div style={{ background: 'white', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>TARGET HARIAN ({operatingDays} hari)</span>
-                    <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--accent-emerald)' }}>
-                      {formatNumber(bepUnitsDay)} <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>unit/hari</span>
+                  <div style={{ background: 'white', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>OMSET MINIMAL BEP</span>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-indigo)' }}>
+                      {formatIdr(bepRevenueMonth)}
                     </div>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Minimal per hari</span>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div style={{ marginTop: '1.25rem', padding: '0.85rem', background: '#e0e7ff', borderRadius: 'var(--radius-sm)', color: '#3730a3', fontSize: '0.8rem' }}>
-              💡 <strong>Tips Sukses MAVIN:</strong> Untuk meraih keuntungan bersih Rp 5.000.000/bulan, Anda perlu menjual tambahan sekitar <strong>{Math.ceil(5000000 / marginPerUnit)} unit</strong> di atas target BEP harian Anda.
+              <div style={{ fontSize: '0.75rem', marginTop: '1rem', background: '#ecfdf5', padding: '0.6rem', borderRadius: 'var(--radius-sm)', color: '#047857' }}>
+                💡 Jual minimal <strong>{bepUnitsDay} porsi per hari</strong> untuk menutup seluruh biaya sewa, gaji, dan listrik toko Anda!
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Staff Modal */}
-      {isStaffModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '500px' }}>
-            <div className="modal-header">
-              <h3>{editingStaffId ? 'Edit Akun Staf Pengguna' : 'Tambah Akun Staf Pengguna Baru'}</h3>
-              <button onClick={() => setIsStaffModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>✕</button>
-            </div>
-            <form onSubmit={handleStaffSubmit}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div className="form-group">
-                  <label className="form-label">Nama Staf / Karyawan *</label>
-                  <input type="text" required placeholder="e.g. Siska Kasir" value={staffName} onChange={e => setStaffName(e.target.value)} className="form-control" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Email Login</label>
-                  <input type="email" placeholder="siska@mavin.id" value={staffEmail} onChange={e => setStaffEmail(e.target.value)} className="form-control" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Alokasi Peran (Role Hak Akses)</label>
-                  <select value={staffRole} onChange={e => setStaffRole(e.target.value as UserRole)} className="form-control">
-                    <option value="cashier">🛒 Kasir (Akses POS)</option>
-                    <option value="manager">👨‍🍳 Dapur & Operasional (Akses Resep & Stok)</option>
-                    <option value="owner">👑 Pemilik (Akses Penuh Super Admin)</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Status Akun</label>
-                  <select value={staffStatus} onChange={e => setStaffStatus(e.target.value as 'Aktif' | 'Non-Aktif')} className="form-control">
-                    <option value="Aktif">Aktif</option>
-                    <option value="Non-Aktif">Non-Aktif</option>
-                  </select>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" onClick={() => setIsStaffModalOpen(false)} className="btn btn-secondary">Batal</button>
-                <button type="submit" className="btn btn-primary">Simpan Staf</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* UPGRADE PAYMENT MODAL (QRIS AUTO-CONFIRM & BANK TRANSFER) */}
+      {isUpgradeModalOpen && (
+        <div className="modal-overlay" style={{ zIndex: 2000 }}>
+          <div className="modal-content" style={{ maxWidth: '480px', padding: 0, overflow: 'hidden' }}>
+            {/* Modal Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)',
+              padding: '1.25rem 1.5rem',
+              color: 'white',
+              position: 'relative'
+            }}>
+              <button
+                onClick={() => setIsUpgradeModalOpen(false)}
+                style={{
+                  position: 'absolute',
+                  top: '12px',
+                  right: '14px',
+                  background: 'rgba(255,255,255,0.2)',
+                  border: 'none',
+                  color: 'white',
+                  width: '26px',
+                  height: '26px',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  fontWeight: 800
+                }}
+              >
+                ✕
+              </button>
 
-      {/* Outlet Modal */}
-      {isOutletModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '500px' }}>
-            <div className="modal-header">
-              <h3>{editingOutletId ? 'Edit Outlet Cabang' : 'Tambah Outlet Cabang Baru'}</h3>
-              <button onClick={() => setIsOutletModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>✕</button>
+              <span className="badge badge-amber" style={{ marginBottom: '0.35rem' }}>INVOICE UPGRADE LANGGANAN</span>
+              <h3 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '0.1rem' }}>
+                Upgrade ke Paket {targetUpgradePlan}
+              </h3>
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#38bdf8' }}>
+                {targetUpgradePlan === 'Enterprise' ? 'Rp 149.000' : 'Rp 69.000'} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: '#e0e7ff' }}>/ bulan</span>
+              </div>
             </div>
-            <form onSubmit={handleOutletSubmit}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div className="form-group">
-                  <label className="form-label">Nama Outlet Cabang *</label>
-                  <input type="text" required placeholder="e.g. MAVIN Branch Lembang" value={outletName} onChange={e => setOutletName(e.target.value)} className="form-control" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Alamat Outlet</label>
-                  <input type="text" placeholder="Jl. Raya Lembang No. 45" value={outletAddress} onChange={e => setOutletAddress(e.target.value)} className="form-control" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Telepon Outlet</label>
-                  <input type="text" placeholder="0813-XXXX-XXXX" value={outletPhone} onChange={e => setOutletPhone(e.target.value)} className="form-control" />
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" onClick={() => setIsOutletModalOpen(false)} className="btn btn-secondary">Batal</button>
-                <button type="submit" className="btn btn-primary">Simpan Outlet</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* Supplier Modal */}
-      {isSupModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '500px' }}>
-            <div className="modal-header">
-              <h3>{editingSupId ? 'Edit Data Supplier' : 'Tambah Supplier Baru'}</h3>
-              <button onClick={() => setIsSupModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>✕</button>
+            {/* Payment Method Tabs */}
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: '#f8fafc' }}>
+              <button
+                type="button"
+                onClick={() => setPaymentMethodTab('qris')}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  border: 'none',
+                  background: paymentMethodTab === 'qris' ? '#ffffff' : 'transparent',
+                  color: paymentMethodTab === 'qris' ? 'var(--primary)' : 'var(--text-muted)',
+                  fontWeight: paymentMethodTab === 'qris' ? 800 : 600,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  borderBottom: paymentMethodTab === 'qris' ? '2px solid var(--primary)' : 'none'
+                }}
+              >
+                📱 QRIS Auto-Confirm
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentMethodTab('bank')}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  border: 'none',
+                  background: paymentMethodTab === 'bank' ? '#ffffff' : 'transparent',
+                  color: paymentMethodTab === 'bank' ? 'var(--primary)' : 'var(--text-muted)',
+                  fontWeight: paymentMethodTab === 'bank' ? 800 : 600,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  borderBottom: paymentMethodTab === 'bank' ? '2px solid var(--primary)' : 'none'
+                }}
+              >
+                🏦 Transfer Bank & WA
+              </button>
             </div>
-            <form onSubmit={handleSupSubmit}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div className="form-group">
-                  <label className="form-label">Nama Supplier / Toko *</label>
-                  <input type="text" required placeholder="e.g. PT Kopi Nusantara" value={supName} onChange={e => setSupName(e.target.value)} className="form-control" />
+
+            {/* Modal Content Body */}
+            <div style={{ padding: '1.5rem' }}>
+              {paymentStatus === 'success' ? (
+                <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+                  <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto' }}>
+                    <CheckCircle2 size={40} />
+                  </div>
+                  <h3 style={{ fontSize: '1.3rem', color: '#16a34a', marginBottom: '0.5rem' }}>
+                    Pembayaran Berhasil Diverifikasi!
+                  </h3>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+                    Selamat! Akun toko <strong>{storeSettings.storeName}</strong> resmi di-upgrade ke <strong>Paket {targetUpgradePlan} (Aktif 30 Hari)</strong>.
+                  </p>
+                  <button onClick={() => setIsUpgradeModalOpen(false)} className="btn btn-primary" style={{ width: '100%', padding: '0.75rem', fontWeight: 800 }}>
+                    Tutup & Mulai Gunakan Fitur PRO
+                  </button>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Kategori Pasokan</label>
-                  <input type="text" placeholder="e.g. Biji Kopi, Susu, Kemasan" value={supCategory} onChange={e => setSupCategory(e.target.value)} className="form-control" />
+              ) : paymentMethodTab === 'qris' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '0.5rem' }}>
+                    SCAN QRIS DENGAN MANDIRI LIVIN, BCA, GOPAY, OVO, SHOPEEPAY:
+                  </div>
+
+                  <div style={{ background: 'white', padding: '0.85rem', borderRadius: '12px', border: '2px solid var(--primary)', marginBottom: '0.85rem', boxShadow: 'var(--shadow-md)' }}>
+                    <QrCode size={180} color="#0f172a" />
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)', marginTop: '0.35rem' }}>
+                      NMID: ID1029384756102
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '0.65rem 1rem', borderRadius: 'var(--radius-sm)', width: '100%', marginBottom: '1rem' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+                      <RefreshCw size={14} className="spin" /> Checking Pembayaran Realtime ({autoCheckSeconds}s)
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: '#15803d' }}>
+                      Sistem otomatis memperbarui status langganan begitu dana diterima!
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={handleSimulatePaymentSuccess}
+                    disabled={paymentStatus === 'verifying'}
+                    className="btn btn-emerald"
+                    style={{ width: '100%', padding: '0.75rem', fontWeight: 800, fontSize: '0.9rem' }}
+                  >
+                    {paymentStatus === 'verifying' ? 'Memverifikasi Pembayaran...' : '⚡ Simulasi Auto-Confirm Pembayaran QRIS'}
+                  </button>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Telepon / WhatsApp</label>
-                  <input type="text" placeholder="0811-XXXX-XXXX" value={supPhone} onChange={e => setSupPhone(e.target.value)} className="form-control" />
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '0.35rem' }}>
+                      TRANSFER REKENING BANK RESMI:
+                    </div>
+                    <div style={{ marginBottom: '0.6rem' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Bank Mandiri:</span>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary)' }}>137-00-1234567-8</div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>a.n. PT MAVIN TEKNOLOGI JUARA</span>
+                    </div>
+
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Bank BCA:</span>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary)' }}>841-098-7654</div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>a.n. PT MAVIN TEKNOLOGI JUARA</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSendWhatsAppConfirmation}
+                    className="btn btn-emerald"
+                    style={{ width: '100%', padding: '0.75rem', fontWeight: 800 }}
+                  >
+                    <Send size={16} /> Kirim Bukti Transfer via WhatsApp
+                  </button>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Alamat / Lokasi</label>
-                  <input type="text" placeholder="Kawasan Industri Cikarang" value={supAddress} onChange={e => setSupAddress(e.target.value)} className="form-control" />
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" onClick={() => setIsSupModalOpen(false)} className="btn btn-secondary">Batal</button>
-                <button type="submit" className="btn btn-emerald">Simpan Supplier</button>
-              </div>
-            </form>
+              )}
+            </div>
           </div>
         </div>
       )}

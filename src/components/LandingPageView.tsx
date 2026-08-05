@@ -18,7 +18,8 @@ import {
   Star,
   Smartphone,
   Download,
-  QrCode
+  QrCode,
+  Clock
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { formatIdr } from '../utils/calculator';
@@ -110,7 +111,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onOpenAuth, on
             className="btn btn-primary"
             style={{ fontWeight: 700 }}
           >
-            <Zap size={16} /> Coba Gratis
+            <Zap size={16} /> Coba Gratis 14 Hari
           </button>
         </div>
       </header>
@@ -123,7 +124,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onOpenAuth, on
         margin: '0 auto'
       }}>
         <span className="badge badge-indigo" style={{ padding: '0.45rem 1rem', fontSize: '0.85rem', marginBottom: '1.25rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-          <Sparkles size={16} /> Software Operasional & HPP UMKM #1 di Indonesia
+          <Sparkles size={16} /> Instant Trial PRO 14 Hari • Otomatis ke Starter Gratis Selamanya
         </span>
 
         <h1 style={{ fontSize: '3rem', fontWeight: 800, lineHeight: 1.15, marginBottom: '1.25rem', letterSpacing: '-0.03em' }}>
@@ -140,7 +141,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onOpenAuth, on
             className="btn btn-primary"
             style={{ padding: '0.85rem 1.8rem', fontSize: '1.05rem', fontWeight: 800 }}
           >
-            Mulai Bebas Coba (Free Trial) <ArrowRight size={20} />
+            Mulai Trial PRO 14 Hari <ArrowRight size={20} />
           </button>
 
           <button
@@ -365,26 +366,26 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onOpenAuth, on
         <div style={{ maxWidth: '1050px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
             <h2>Pilih Paket Langganan Hemat MAVIN SaaS</h2>
-            <p style={{ color: 'var(--text-muted)' }}>Investasi terjangkau untuk bisnis UMKM yang rapi & menguntungkan.</p>
+            <p style={{ color: 'var(--text-muted)' }}>Mulai dengan Trial PRO 14 Hari Gratis. Otomatis beralih ke Starter Gratis Selamanya jika tidak upgrade.</p>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
             {/* Starter Plan */}
             <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div>
-                <span className="badge badge-emerald" style={{ marginBottom: '0.5rem' }}>🎁 Starter (Gratis)</span>
+                <span className="badge badge-emerald" style={{ marginBottom: '0.5rem' }}>🎁 Starter (Gratis Selamanya)</span>
                 <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Rp 0 <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)' }}>/ selamanya</span></h3>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>Cocok untuk usaha rintisan baru yang ingin mencoba merapikan resep.</p>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>Paket otomatis saat masa Trial PRO 14 Hari selesai jika belum upgrade.</p>
 
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.875rem' }}>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Check size={16} color="#16a34a" /> 1 Outlet Usaha</li>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Check size={16} color="#16a34a" /> 1 Outlet Cabang</li>
                   <li style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Check size={16} color="#16a34a" /> Hingga 5 Resep Menu</li>
                   <li style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Check size={16} color="#16a34a" /> POS Kasir Dasar</li>
                 </ul>
               </div>
 
               <button onClick={() => onOpenAuth('register')} className="btn btn-outline" style={{ marginTop: '1.5rem', width: '100%' }}>
-                Daftar Paket Starter
+                Daftar & Pakai Starter
               </button>
             </div>
 
@@ -395,9 +396,9 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onOpenAuth, on
               </span>
 
               <div>
-                <span className="badge badge-indigo" style={{ marginBottom: '0.5rem' }}>⚡ Paket PRO</span>
+                <span className="badge badge-indigo" style={{ marginBottom: '0.5rem' }}>⚡ Paket PRO (Trial 14 Hari)</span>
                 <h3 style={{ fontSize: '1.8rem', color: 'var(--primary)', marginBottom: '0.5rem' }}>Rp 69.000 <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)' }}>/ bulan</span></h3>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>Pilihan terbaik untuk toko outlet yang ingin berkembang pesat.</p>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>Gratis Akses PRO 14 Hari Pertama Saat Mendaftar!</p>
 
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.875rem' }}>
                   <li style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Check size={16} color="#16a34a" /> <strong>Multi-Outlet (Hingga 3 Cabang)</strong></li>
@@ -409,7 +410,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onOpenAuth, on
               </div>
 
               <button onClick={() => onOpenAuth('register')} className="btn btn-primary" style={{ marginTop: '1.5rem', width: '100%', fontWeight: 800 }}>
-                Mulai Trial PRO 14 Hari
+                Coba Akses PRO 14 Hari Gratis
               </button>
             </div>
 

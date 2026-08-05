@@ -13,30 +13,37 @@ import { SaasAdminView } from './components/SaasAdminView';
 import { LandingPageView } from './components/LandingPageView';
 import { AuthModal } from './components/AuthModal';
 import { UserRole } from './types';
+import { Lock, Award, ShieldAlert, ArrowRight } from 'lucide-react';
 
 export function AppContent() {
-  // Public visitors default to the Landing Page on web, but Native Android APK bypasses Landing Page!
   const [viewMode, setViewMode] = useState<'landing' | 'app'>('landing');
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
+  // Strict Authentication Guard State
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    return localStorage.getItem('mavin_is_logged_in') === 'true';
+  });
+
   const { currentRole, setCurrentRole, hasTabAccess, storeSettings } = useApp();
 
-  // Detect Capacitor Native Android Platform: Bypass Landing Page on APK & Open Login Modal directly!
-  useEffect(() => {
-    const isNativeApk =
-      Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
-      Boolean((window as any).Capacitor?.getPlatform?.() === 'android') ||
-      Boolean((window as any).Capacitor?.platform === 'android');
+  // Detect Capacitor Native Android Platform
+  const isNativeApk =
+    Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
+    Boolean((window as any).Capacitor?.getPlatform?.() === 'android') ||
+    Boolean((window as any).Capacitor?.platform === 'android');
 
+  useEffect(() => {
     if (isNativeApk) {
       setViewMode('app');
-      setIsAuthOpen(true);
+      if (!isLoggedIn) {
+        setIsAuthOpen(true);
+      }
     }
-  }, []);
+  }, [isNativeApk, isLoggedIn]);
 
-  // Dynamically update primary color and background theme CSS variables!
+  // Dynamically update primary color and background theme CSS variables
   useEffect(() => {
     const root = document.documentElement;
     const color = storeSettings.primaryColor || '#4f46e5';
@@ -57,8 +64,9 @@ export function AppContent() {
     cashier: ['pos']
   };
 
-  // Smart Fallback Redirect: If activeTab is not allowed for currentRole, redirect automatically!
+  // Redirect to permitted tab if activeTab is not allowed
   useEffect(() => {
+    if (!isLoggedIn) return;
     const permitted = allowedTabs[currentRole] || allowedTabs.owner;
     if (!permitted.includes(activeTab)) {
       if (currentRole === 'cashier') {
@@ -71,7 +79,7 @@ export function AppContent() {
         setActiveTab('dashboard');
       }
     }
-  }, [currentRole, activeTab]);
+  }, [currentRole, activeTab, isLoggedIn]);
 
   const handleOpenAuth = (mode: 'login' | 'register') => {
     setAuthMode(mode);
@@ -79,8 +87,12 @@ export function AppContent() {
   };
 
   const handleLoginSuccess = (role: UserRole) => {
+    setIsLoggedIn(true);
+    localStorage.setItem('mavin_is_logged_in', 'true');
     setCurrentRole(role);
     setViewMode('app');
+    setIsAuthOpen(false);
+
     if (role === 'saas_admin') {
       setActiveTab('saas_admin');
     } else if (role === 'cashier') {
@@ -93,12 +105,9 @@ export function AppContent() {
   };
 
   const handleLogout = () => {
-    // Reset role to default owner upon logout & return to Login Page on APK or Landing Page on Web
+    setIsLoggedIn(false);
+    localStorage.removeItem('mavin_is_logged_in');
     setCurrentRole('owner');
-    const isNativeApk =
-      Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
-      Boolean((window as any).Capacitor?.getPlatform?.() === 'android') ||
-      Boolean((window as any).Capacitor?.platform === 'android');
 
     if (isNativeApk) {
       setViewMode('app');
@@ -109,7 +118,8 @@ export function AppContent() {
     }
   };
 
-  if (viewMode === 'landing') {
+  // 1. Landing Page View (Web Only)
+  if (viewMode === 'landing' && !isNativeApk) {
     return (
       <>
         <LandingPageView
@@ -120,14 +130,91 @@ export function AppContent() {
         />
         <AuthModal
           isOpen={isAuthOpen}
-          onClose={() => setIsAuthOpen(false)}
+          onClose={() => {
+            if (!isLoggedIn) {
+              setIsAuthOpen(false);
+            }
+          }}
           initialMode={authMode}
           onLoginSuccess={handleLoginSuccess}
+          allowClose={true}
         />
       </>
     );
   }
 
+  // 2. UNAUTHENTICATED MANDATORY LOGIN SCREEN (APK / Web Direct App Access)
+  if (!isLoggedIn) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        width: '100vw',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1.5rem',
+        boxSizing: 'border-box',
+        color: 'white'
+      }}>
+        <div style={{
+          textAlign: 'center',
+          maxWidth: '420px',
+          width: '100%',
+          marginBottom: '1.5rem'
+        }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '16px',
+            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 1rem auto',
+            boxShadow: '0 10px 25px rgba(79, 70, 229, 0.4)'
+          }}>
+            <Award size={36} color="#ffffff" />
+          </div>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.35rem' }}>
+            MAVIN SaaS POS
+          </h1>
+          <p style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
+            Aplikasi Manajemen & Kasir UMKM Juara. Silakan login untuk mengelola toko Anda.
+          </p>
+        </div>
+
+        <button
+          onClick={() => handleOpenAuth('login')}
+          className="btn btn-primary"
+          style={{
+            padding: '0.85rem 2rem',
+            fontSize: '1rem',
+            fontWeight: 800,
+            borderRadius: 'var(--radius-md)',
+            boxShadow: '0 8px 20px rgba(79, 70, 229, 0.35)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.6rem'
+          }}
+        >
+          <Lock size={20} /> Masuk Ke Akun Toko <ArrowRight size={20} />
+        </button>
+
+        {/* Mandatory Auth Modal (No Close Button when Unauthenticated!) */}
+        <AuthModal
+          isOpen={true}
+          onClose={() => {}}
+          initialMode={authMode}
+          onLoginSuccess={handleLoginSuccess}
+          allowClose={!isNativeApk && isLoggedIn}
+        />
+      </div>
+    );
+  }
+
+  // 3. AUTHENTICATED APP WORKSPACE
   return (
     <div className="app-container">
       <Sidebar
@@ -154,15 +241,17 @@ export function AppContent() {
         onClose={() => setIsAuthOpen(false)}
         initialMode={authMode}
         onLoginSuccess={handleLoginSuccess}
+        allowClose={true}
       />
     </div>
   );
 }
 
-export default function App() {
+export function App() {
   return (
     <AppProvider>
       <AppContent />
     </AppProvider>
   );
 }
+export default App;

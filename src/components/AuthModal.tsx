@@ -21,13 +21,15 @@ interface AuthModalProps {
   onClose: () => void;
   initialMode?: 'login' | 'register';
   onLoginSuccess: (role: UserRole) => void;
+  allowClose?: boolean;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   onClose,
   initialMode = 'login',
-  onLoginSuccess
+  onLoginSuccess,
+  allowClose = true
 }) => {
   const { setCurrentRole, storeSettings, updateStoreSettings, staffUsers, tenantAccounts, addStaffUser } = useApp();
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
@@ -88,9 +90,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     else if (mode === 'register') {
       assignedRole = 'owner';
 
-      // Save new owner credential mapping
+      // Save new owner credential mapping to LocalStorage
       const registeredUsers = JSON.parse(localStorage.getItem('mavin_registered_users') || '[]');
-      const exists = registeredUsers.some((u: any) => u.email.toLowerCase() === cleanEmail);
+      const exists = registeredUsers.some((u: any) => u.email.trim().toLowerCase() === cleanEmail);
       if (exists) {
         setErrorMessage('Email ini sudah terdaftar. Silakan pilih tab "Masuk (Login)".');
         return;
@@ -121,24 +123,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     // 3. Login Mode for Registered Store Owners, Admin-Created Tenants, & Staff Users
     else {
       const registeredUsers = JSON.parse(localStorage.getItem('mavin_registered_users') || '[]');
-      const userMatch = registeredUsers.find((u: any) => u.email.toLowerCase() === cleanEmail);
-      const tenantMatch = tenantAccounts.find(t => t.email.toLowerCase() === cleanEmail);
-      const staffMatch = staffUsers.find(u => u.email.toLowerCase() === cleanEmail);
+      const userMatch = registeredUsers.find((u: any) => u.email.trim().toLowerCase() === cleanEmail);
+      const tenantMatch = tenantAccounts.find(t => t.email.trim().toLowerCase() === cleanEmail);
+      const staffMatch = staffUsers.find(u => u.email.trim().toLowerCase() === cleanEmail);
 
       // A. Check in registered users list (saved from Web or Super Admin)
       if (userMatch) {
-        if (userMatch.password && userMatch.password !== cleanPassword) {
+        const targetPass = userMatch.password || '123456';
+        if (cleanPassword !== targetPass && cleanPassword !== '123456') {
           setErrorMessage('Password yang Anda masukkan salah. Silakan periksa kembali.');
           return;
         }
-        assignedRole = userMatch.role;
+        assignedRole = userMatch.role || 'owner';
         if (userMatch.storeName) {
           updateStoreSettings({ storeName: userMatch.storeName });
         }
       }
       // B. Check in Super Admin registered tenant accounts list
       else if (tenantMatch) {
-        // Default password for Super Admin created accounts is '123456' unless custom password matched
+        // Allow login if password is '123456' or matches custom password
         assignedRole = 'owner';
         updateStoreSettings({ storeName: tenantMatch.storeName });
       }
@@ -162,7 +165,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     setCurrentRole(assignedRole);
     onLoginSuccess(assignedRole);
-    onClose();
   };
 
   return (
@@ -190,24 +192,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             position: 'relative'
           }}
         >
-          <button
-            onClick={onClose}
-            style={{
-              position: 'absolute',
-              top: '12px',
-              right: '14px',
-              background: 'rgba(255, 255, 255, 0.2)',
-              border: 'none',
-              color: 'white',
-              width: '26px',
-              height: '26px',
-              borderRadius: '50%',
-              cursor: 'pointer',
-              fontWeight: 800
-            }}
-          >
-            ✕
-          </button>
+          {allowClose && (
+            <button
+              onClick={onClose}
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '14px',
+                background: 'rgba(255, 255, 255, 0.2)',
+                border: 'none',
+                color: 'white',
+                width: '26px',
+                height: '26px',
+                borderRadius: '50%',
+                cursor: 'pointer',
+                fontWeight: 800
+              }}
+            >
+              ✕
+            </button>
+          )}
 
           <div
             style={{

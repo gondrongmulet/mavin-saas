@@ -130,8 +130,8 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const STORAGE_KEYS = {
   ROLE: 'mavin_current_role_v1',
   ROLE_PERMISSIONS: 'mavin_role_permissions_v2',
-  STAFF: 'mavin_staff_v1',
-  TENANTS: 'mavin_tenants_v1',
+  STAFF: 'mavin_staff_v2',
+  TENANTS: 'mavin_tenants_v5',
   OUTLETS: 'mavin_outlets_v1',
   SUPPLIERS: 'mavin_suppliers_v1',
   SETTINGS: 'mavin_settings_v1',

@@ -62,12 +62,15 @@ export const SaasAdminView: React.FC = () => {
 
   const handleCreateTenant = (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanEm = newEmail.trim().toLowerCase();
+    const cleanPw = newPassword.trim() || '123456';
     const fee = newPlan === 'Enterprise' ? 149000 : newPlan === 'Pro' ? 69000 : 0;
+
     const newTenant: Omit<TenantAccount, 'id'> = {
-      storeName: newStoreName,
-      ownerName: newOwnerName,
-      email: newEmail,
-      phone: newPhone,
+      storeName: newStoreName.trim(),
+      ownerName: newOwnerName.trim(),
+      email: cleanEm,
+      phone: newPhone.trim(),
       plan: newPlan,
       status: 'Aktif',
       expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -81,26 +84,27 @@ export const SaasAdminView: React.FC = () => {
 
     // 2. Automatically sync Credential User for Store Owner Login!
     addStaffUser({
-      name: `${newOwnerName} (Pemilik)`,
-      email: newEmail,
+      name: `${newOwnerName.trim()} (Pemilik)`,
+      email: cleanEm,
       role: 'owner',
-      outletName: newStoreName,
+      outletName: newStoreName.trim(),
       status: 'Aktif'
     });
 
-    // 3. Save Credential mapping into LocalStorage accounts registry
+    // 3. Save Credential mapping into LocalStorage accounts registry with clean filtering
     const registeredUsers = JSON.parse(localStorage.getItem('mavin_registered_users') || '[]');
-    registeredUsers.push({
-      email: newEmail,
-      password: newPassword || '123456',
+    const filteredUsers = registeredUsers.filter((u: any) => u.email.trim().toLowerCase() !== cleanEm);
+    filteredUsers.push({
+      email: cleanEm,
+      password: cleanPw,
       role: 'owner',
-      storeName: newStoreName,
-      ownerName: newOwnerName,
-      phone: newPhone
+      storeName: newStoreName.trim(),
+      ownerName: newOwnerName.trim(),
+      phone: newPhone.trim()
     });
-    localStorage.setItem('mavin_registered_users', JSON.stringify(registeredUsers));
+    localStorage.setItem('mavin_registered_users', JSON.stringify(filteredUsers));
 
-    alert(`✅ Toko "${newStoreName}" berhasil didaftarkan!\n\nPemilik toko sekarang dapat login menggunakan:\n📧 Email: ${newEmail}\n🔑 Password: ${newPassword || '123456'}`);
+    alert(`✅ Toko "${newStoreName}" berhasil didaftarkan!\n\nPemilik toko sekarang dapat login menggunakan:\n📧 Email: ${cleanEm}\n🔑 Password: ${cleanPw}`);
 
     setIsAddModalOpen(false);
 

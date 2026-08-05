@@ -515,18 +515,18 @@ export const SaasAdminView: React.FC = () => {
       {/* Modal Add New Tenant */}
       {isAddModalOpen && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '480px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <div className="modal-content" style={{ maxWidth: '500px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
+              <h3 style={{ fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <Plus size={20} color="var(--primary)" /> Daftarkan Tenant Toko Baru
               </h3>
-              <button onClick={() => setIsAddModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+              <button onClick={() => setIsAddModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.2rem' }}>
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateTenant} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
+            <form onSubmit={handleCreateTenant} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div className="form-group">
                 <label className="form-label">Nama Toko / UMKM *</label>
                 <input
                   type="text"
@@ -538,7 +538,7 @@ export const SaasAdminView: React.FC = () => {
                 />
               </div>
 
-              <div className="form-group" style={{ marginBottom: 0 }}>
+              <div className="form-group">
                 <label className="form-label">Nama Pemilik *</label>
                 <input
                   type="text"
@@ -550,7 +550,7 @@ export const SaasAdminView: React.FC = () => {
                 />
               </div>
 
-              <div className="form-group" style={{ marginBottom: 0 }}>
+              <div className="form-group">
                 <label className="form-label">Email Pemilik *</label>
                 <input
                   type="email"
@@ -562,7 +562,7 @@ export const SaasAdminView: React.FC = () => {
                 />
               </div>
 
-              <div className="form-group" style={{ marginBottom: 0 }}>
+              <div className="form-group">
                 <label className="form-label">Nomor WhatsApp Aktif *</label>
                 <input
                   type="text"
@@ -574,7 +574,7 @@ export const SaasAdminView: React.FC = () => {
                 />
               </div>
 
-              <div className="form-group" style={{ marginBottom: 0 }}>
+              <div className="form-group">
                 <label className="form-label">Pilihan Paket Langganan *</label>
                 <select
                   value={newPlan}
@@ -588,11 +588,11 @@ export const SaasAdminView: React.FC = () => {
                 </select>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button type="button" onClick={() => setIsAddModalOpen(false)} className="btn btn-outline" style={{ flex: 1 }}>
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.85rem' }}>
+                <button type="button" onClick={() => setIsAddModalOpen(false)} className="btn btn-outline" style={{ flex: 1, padding: '0.7rem' }}>
                   Batal
                 </button>
-                <button type="submit" className="btn btn-primary" style={{ flex: 1, fontWeight: 800 }}>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1, padding: '0.7rem', fontWeight: 800 }}>
                   Simpan & Aktifkan Toko
                 </button>
               </div>

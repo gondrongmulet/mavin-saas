@@ -54,60 +54,7 @@ const INITIAL_STAFF_USERS: StaffUser[] = [
   { id: 'st-3', name: 'Budi Kasir', email: 'kasir1@mavin.id', role: 'cashier', outletName: 'Pusat Sudirman', status: 'Aktif' }
 ];
 
-const INITIAL_TENANT_ACCOUNTS: TenantAccount[] = [
-  {
-    id: 't-101',
-    storeName: 'MAVIN Kopi & Bakery (Usaha Anda)',
-    ownerName: 'Pak Andi',
-    email: 'owner@mavin.id',
-    phone: '0812-3456-7890',
-    plan: 'Enterprise',
-    status: 'Aktif',
-    expiryDate: '2027-12-31',
-    monthlyFee: 149000,
-    outletCount: 2,
-    registerDate: '2026-01-10'
-  },
-  {
-    id: 't-102',
-    storeName: 'Roti Bakar Juara Lembang',
-    ownerName: 'Bu Siska Rahma',
-    email: 'siska@rotijuara.com',
-    phone: '0813-9876-5432',
-    plan: 'Pro',
-    status: 'Aktif',
-    expiryDate: '2026-11-15',
-    monthlyFee: 69000,
-    outletCount: 1,
-    registerDate: '2026-02-14'
-  },
-  {
-    id: 't-103',
-    storeName: 'Dimsum Ayam Express Senopati',
-    ownerName: 'Mas Hendra',
-    email: 'hendra@dimsumexpress.id',
-    phone: '0857-1122-3344',
-    plan: 'Pro',
-    status: 'Aktif',
-    expiryDate: '2026-10-01',
-    monthlyFee: 69000,
-    outletCount: 2,
-    registerDate: '2026-03-01'
-  },
-  {
-    id: 't-104',
-    storeName: 'Warung Es Teh Solo Mantap',
-    ownerName: 'Mbak Dewi',
-    email: 'dewi@estehsolo.com',
-    phone: '0878-4455-6677',
-    plan: 'Starter',
-    status: 'Trial',
-    expiryDate: '2026-08-15',
-    monthlyFee: 0,
-    outletCount: 1,
-    registerDate: '2026-08-01'
-  }
-];
+const INITIAL_TENANT_ACCOUNTS: TenantAccount[] = [];
 
 interface AppContextType {
   // Role & Permissions
@@ -162,6 +109,9 @@ interface AppContextType {
   addRecipe: (recipe: Omit<Recipe, 'id' | 'finishedStock'>) => void;
   updateRecipe: (id: string, recipe: Partial<Recipe>) => void;
   deleteRecipe: (id: string) => void;
+
+  // Tenant Management
+  addTenantAccount: (tenant: Omit<TenantAccount, 'id'>) => void;
 
   // Production actions
   executeProductionBatch: (recipeId: string, batchCount: number, notes?: string) => { success: boolean; message: string };
@@ -298,6 +248,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const hasTabAccess = (role: UserRole, tabId: string): boolean => {
     if (role === 'owner' || role === 'saas_admin') return true; // Owner & SaaS Admin have 100% access
     return Boolean(rolePermissions[role]?.[tabId]);
+  };
+
+  const addTenantAccount = (tenantData: Omit<TenantAccount, 'id'>) => {
+    const newTenant: TenantAccount = { ...tenantData, id: `t-${Date.now()}` };
+    setTenantAccounts(prev => [newTenant, ...prev]);
   };
 
   // Staff Users Actions
@@ -587,6 +542,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         tenantAccounts,
         updateTenantStatus,
         staffUsers,
+        addTenantAccount,
         addStaffUser,
         updateStaffUser,
         deleteStaffUser,

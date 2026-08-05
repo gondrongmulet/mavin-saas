@@ -72,7 +72,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     let assignedRole: UserRole = 'owner';
 
     // -------------------------------------------------------------
-    // STRICT SECURITY ROLE RESOLUTION
+    // STRICT PRODUCTION AUTHENTICATION & ROLE VERIFICATION
     // -------------------------------------------------------------
     
     // 1. Super Admin ONLY granted for EXACT credentials: admin@mavin.id / superadmin123
@@ -91,44 +91,53 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       // Save new owner credential mapping
       const registeredUsers = JSON.parse(localStorage.getItem('mavin_registered_users') || '[]');
       const exists = registeredUsers.some((u: any) => u.email.toLowerCase() === cleanEmail);
-      if (!exists) {
-        registeredUsers.push({
-          email: cleanEmail,
-          password: cleanPassword,
-          role: 'owner',
-          storeName: storeNameInput || 'Toko UMKM Baru',
-          ownerName: ownerNameInput || 'Pemilik Toko',
-          phone: phoneInput
-        });
-        localStorage.setItem('mavin_registered_users', JSON.stringify(registeredUsers));
-
-        addStaffUser({
-          name: ownerNameInput || 'Pemilik Toko',
-          email: cleanEmail,
-          role: 'owner',
-          outletName: storeNameInput || 'Toko Utama',
-          status: 'Aktif'
-        });
+      if (exists) {
+        setErrorMessage('Email ini sudah terdaftar. Silakan pilih tab "Masuk (Login)".');
+        return;
       }
+
+      registeredUsers.push({
+        email: cleanEmail,
+        password: cleanPassword,
+        role: 'owner',
+        storeName: storeNameInput || 'Toko UMKM Baru',
+        ownerName: ownerNameInput || 'Pemilik Toko',
+        phone: phoneInput
+      });
+      localStorage.setItem('mavin_registered_users', JSON.stringify(registeredUsers));
+
+      addStaffUser({
+        name: ownerNameInput || 'Pemilik Toko',
+        email: cleanEmail,
+        role: 'owner',
+        outletName: storeNameInput || 'Toko Utama',
+        status: 'Aktif'
+      });
     }
     // 3. Login Mode for Registered Store Owners & Staff Users
     else {
-      // Check in registered users list
       const registeredUsers = JSON.parse(localStorage.getItem('mavin_registered_users') || '[]');
       const userMatch = registeredUsers.find((u: any) => u.email.toLowerCase() === cleanEmail);
       const staffMatch = staffUsers.find(u => u.email.toLowerCase() === cleanEmail);
 
+      // Check registered users list
       if (userMatch) {
+        if (userMatch.password && userMatch.password !== cleanPassword) {
+          setErrorMessage('Password yang Anda masukkan salah. Silakan periksa kembali.');
+          return;
+        }
         assignedRole = userMatch.role;
-      } else if (staffMatch) {
+      }
+      // Check built-in demo / staff accounts
+      else if (staffMatch) {
         assignedRole = staffMatch.role;
-      } else if (cleanEmail.includes('dapur')) {
-        assignedRole = 'manager';
-      } else if (cleanEmail.includes('kasir')) {
-        assignedRole = 'cashier';
-      } else {
-        // All general store loggers default to Store Owner ('owner')
-        assignedRole = 'owner';
+      } else if (cleanEmail === 'owner@mavin.id' || cleanEmail === 'dapur@mavin.id' || cleanEmail === 'kasir@mavin.id') {
+        assignedRole = cleanEmail.includes('dapur') ? 'manager' : cleanEmail.includes('kasir') ? 'cashier' : 'owner';
+      }
+      // UNREGISTERED EMAIL: STRICT REJECTION!
+      else {
+        setErrorMessage('Email atau Password belum terdaftar. Silakan pilih tab "Daftar Toko Baru" untuk mendaftar.');
+        return;
       }
     }
 

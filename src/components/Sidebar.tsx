@@ -97,10 +97,10 @@ export const Sidebar: React.FC<NavigationProps> = ({ activeTab, setActiveTab, on
     <>
       {/* 1. Mobile Top Header Bar */}
       <header className="mobile-top-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <div style={{
-            width: '36px',
-            height: '36px',
+            width: '34px',
+            height: '34px',
             borderRadius: '10px',
             background: currentRole === 'saas_admin' ? '#312e81' : (storeSettings.primaryColor || 'var(--primary)'),
             display: 'flex',
@@ -109,32 +109,42 @@ export const Sidebar: React.FC<NavigationProps> = ({ activeTab, setActiveTab, on
             color: 'white',
             fontWeight: 800,
             boxShadow: '0 3px 8px rgba(0, 0, 0, 0.15)',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            flexShrink: 0
           }}>
-            {currentRole === 'saas_admin' ? <Crown size={20} /> : renderLogo(20)}
+            {currentRole === 'saas_admin' ? <Crown size={18} /> : renderLogo(18)}
           </div>
           <div>
-            <h2 style={{ fontSize: '1.05rem', lineHeight: '1.1', color: currentRole === 'saas_admin' ? '#312e81' : (storeSettings.primaryColor || 'var(--primary)'), letterSpacing: '0.01em' }}>
+            <h2 style={{ fontSize: '0.95rem', lineHeight: '1.1', color: currentRole === 'saas_admin' ? '#312e81' : (storeSettings.primaryColor || 'var(--primary)'), letterSpacing: '0.01em' }}>
               {currentRole === 'saas_admin' ? 'MAVIN SaaS' : storeSettings.storeName.split(' ')[0]}
             </h2>
-            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+            <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 700 }}>
               {currentRole === 'saas_admin' ? '👑 Master Admin' : currentRole === 'owner' ? '🏢 Pemilik' : currentRole === 'manager' ? '👨‍🍳 Dapur' : '🛒 Kasir'}
             </span>
           </div>
         </div>
 
-        {/* Quick Role Switcher Mobile */}
-        <select
-          value={currentRole}
-          onChange={e => setCurrentRole(e.target.value as UserRole)}
-          className="form-control"
-          style={{ width: 'auto', padding: '0.3rem 0.5rem', fontSize: '0.75rem', fontWeight: 700 }}
-        >
-          <option value="owner">🏢 Pemilik Toko</option>
-          <option value="manager">👨‍🍳 Staf Dapur</option>
-          <option value="cashier">🛒 Staf Kasir</option>
-          <option value="saas_admin">👑 Master Admin SaaS</option>
-        </select>
+        {/* Mobile Header Logout & Action Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="btn btn-outline"
+              style={{
+                fontSize: '0.72rem',
+                padding: '0.35rem 0.6rem',
+                color: 'var(--accent-rose)',
+                borderColor: '#fca5a5',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.25rem'
+              }}
+            >
+              <LogOut size={13} /> Keluar
+            </button>
+          )}
+        </div>
       </header>
 
       {/* 2. Desktop Sidebar Component */}

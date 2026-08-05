@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { UserRole } from '../types';
+import { syncCloudUserSave } from '../utils/supabaseSync';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -112,6 +113,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       registeredUsers.push(newStore);
       localStorage.setItem('mavin_registered_users', JSON.stringify(registeredUsers));
+
+      // Push credentials to cloud so Web login can find them too
+      syncCloudUserSave(newStore);
 
       // Also register to SaaS Tenant list so Super Admin sees the new registered store!
       addTenantAccount({

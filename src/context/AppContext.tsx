@@ -24,7 +24,7 @@ import {
   INITIAL_STORE_SETTINGS
 } from '../utils/sampleData';
 import { calculateRecipeHppDetails } from '../utils/calculator';
-import { syncCloudTenantsFetch, syncCloudTenantSave } from '../utils/supabaseSync';
+import { syncCloudTenantsFetch, syncCloudTenantSave, syncCloudUsersFetch } from '../utils/supabaseSync';
 
 const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
   manager: {
@@ -144,55 +144,9 @@ const STORAGE_KEYS = {
   SALES: 'mavin_sales'
 };
 
-const DEFAULT_INITIAL_TENANT: TenantAccount = {
-  id: 'TNT-001',
-  storeName: 'Toko Ibu Alvina (Sample)',
-  ownerName: 'Ibu Alvina',
-  email: 'pemilik@tokoalvina.id',
-  phone: '081234567890',
-  plan: 'Pro',
-  status: 'Aktif',
-  expiryDate: '2026-12-31',
-  monthlyFee: 69000,
-  outletCount: 1,
-  registerDate: '2026-08-05'
-};
-
 function getInitialTenantsList(): TenantAccount[] {
   const savedTenantsStr = localStorage.getItem('mavin_tenants_v5');
-  const registeredUsersStr = localStorage.getItem('mavin_registered_users');
-  
-  let list: TenantAccount[] = savedTenantsStr ? JSON.parse(savedTenantsStr) : [];
-
-  if (registeredUsersStr) {
-    try {
-      const regUsers = JSON.parse(registeredUsersStr);
-      regUsers.forEach((u: any) => {
-        if (u.email && u.email !== 'admin@mavin.id' && !list.some(t => t.email.trim().toLowerCase() === u.email.trim().toLowerCase())) {
-          list.push({
-            id: `TNT-REG-${Date.now()}`,
-            storeName: u.storeName || `Toko ${u.ownerName || 'UMKM'}`,
-            ownerName: u.ownerName || 'Pemilik Toko',
-            email: u.email,
-            phone: u.phone || '08123456789',
-            plan: 'Pro',
-            status: 'Aktif',
-            expiryDate: '2026-12-31',
-            monthlyFee: 69000,
-            outletCount: 1,
-            registerDate: new Date().toISOString().split('T')[0]
-          });
-        }
-      });
-    } catch (e) {}
-  }
-
-  if (list.length === 0) {
-    list = [DEFAULT_INITIAL_TENANT];
-  }
-
-  localStorage.setItem('mavin_tenants_v5', JSON.stringify(list));
-  return list;
+  return savedTenantsStr ? JSON.parse(savedTenantsStr) : [];
 }
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -217,13 +171,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return getInitialTenantsList();
   });
 
-  // Fetch Cloud Tenants from Supabase Realtime DB on mount
+  // Full 2-way cloud sync on mount: push local→cloud AND pull cloud→local
   useEffect(() => {
-    syncCloudTenantsFetch().then(cloudTenants => {
-      if (cloudTenants && cloudTenants.length > 0) {
-        setTenantAccounts(cloudTenants);
+    // 1. Sync tenants (2-way merge)
+    syncCloudTenantsFetch().then(mergedTenants => {
+      if (mergedTenants && mergedTenants.length > 0) {
+        setTenantAccounts(mergedTenants);
       }
     });
+    // 2. Sync registered users / login credentials (2-way merge)
+    syncCloudUsersFetch();
   }, []);
 
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>(() => {

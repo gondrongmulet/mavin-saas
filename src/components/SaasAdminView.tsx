@@ -23,6 +23,7 @@ import {
   Lock
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { syncCloudUserSave } from '../utils/supabaseSync';
 import { formatIdr } from '../utils/calculator';
 import { TenantAccount } from '../types';
 
@@ -103,6 +104,16 @@ export const SaasAdminView: React.FC = () => {
       phone: newPhone.trim()
     });
     localStorage.setItem('mavin_registered_users', JSON.stringify(filteredUsers));
+
+    // Push credentials to cloud immediately
+    syncCloudUserSave({
+      email: cleanEm,
+      password: cleanPw,
+      role: 'owner',
+      storeName: newStoreName.trim(),
+      ownerName: newOwnerName.trim(),
+      phone: newPhone.trim()
+    });
 
     alert(`✅ Toko "${newStoreName}" berhasil didaftarkan!\n\nPemilik toko sekarang dapat login menggunakan:\n📧 Email: ${cleanEm}\n🔑 Password: ${cleanPw}`);
 

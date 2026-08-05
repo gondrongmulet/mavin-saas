@@ -10,7 +10,8 @@ import {
   ShieldCheck,
   CheckCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  AlertCircle
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { UserRole } from '../types';
@@ -28,16 +29,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   initialMode = 'login',
   onLoginSuccess
 }) => {
-  const { setCurrentRole, storeSettings, staffUsers } = useApp();
+  const { setCurrentRole, storeSettings, staffUsers, addStaffUser } = useApp();
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
 
-  // Production Security: All fields default to empty strings!
+  // Form Inputs
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [storeNameInput, setStoreNameInput] = useState('');
   const [ownerNameInput, setOwnerNameInput] = useState('');
   const [phoneInput, setPhoneInput] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Reset form inputs every time the modal opens or mode changes
   useEffect(() => {
@@ -49,6 +51,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setOwnerNameInput('');
       setPhoneInput('');
       setShowPassword(false);
+      setErrorMessage('');
     }
   }, [isOpen, initialMode]);
 
@@ -56,27 +59,82 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage('');
 
-    // Production Automatic Role Resolution based on Email
     const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+
+    if (!cleanEmail || !cleanPassword) {
+      setErrorMessage('Silakan isi email dan password Anda.');
+      return;
+    }
+
     let assignedRole: UserRole = 'owner';
 
-    // 1. Check if email matches SaaS Super Admin
-    if (cleanEmail === 'admin@mavin.id' || cleanEmail.includes('admin')) {
-      assignedRole = 'saas_admin';
+    // -------------------------------------------------------------
+    // STRICT SECURITY ROLE RESOLUTION
+    // -------------------------------------------------------------
+    
+    // 1. Super Admin ONLY granted for EXACT credentials: admin@mavin.id / superadmin123
+    if (cleanEmail === 'admin@mavin.id') {
+      if (cleanPassword === 'superadmin123') {
+        assignedRole = 'saas_admin';
+      } else {
+        setErrorMessage('Password Super Admin salah. Silakan coba lagi.');
+        return;
+      }
     } 
-    // 2. Check registered staff users list in AppContext
+    // 2. Registration Mode (New Store Registration)
+    else if (mode === 'register') {
+      assignedRole = 'owner';
+
+      // Save new owner credential mapping
+      const registeredUsers = JSON.parse(localStorage.getItem('mavin_registered_users') || '[]');
+      const exists = registeredUsers.some((u: any) => u.email.toLowerCase() === cleanEmail);
+      if (!exists) {
+        registeredUsers.push({
+          email: cleanEmail,
+          password: cleanPassword,
+          role: 'owner',
+          storeName: storeNameInput || 'Toko UMKM Baru',
+          ownerName: ownerNameInput || 'Pemilik Toko',
+          phone: phoneInput
+        });
+        localStorage.setItem('mavin_registered_users', JSON.stringify(registeredUsers));
+
+        addStaffUser({
+          name: ownerNameInput || 'Pemilik Toko',
+          email: cleanEmail,
+          role: 'owner',
+          outletName: storeNameInput || 'Toko Utama',
+          status: 'Aktif'
+        });
+      }
+    }
+    // 3. Login Mode for Registered Store Owners & Staff Users
     else {
-      const foundStaff = staffUsers.find(u => u.email.toLowerCase() === cleanEmail);
-      if (foundStaff) {
-        assignedRole = foundStaff.role;
+      // Check in registered users list
+      const registeredUsers = JSON.parse(localStorage.getItem('mavin_registered_users') || '[]');
+      const userMatch = registeredUsers.find((u: any) => u.email.toLowerCase() === cleanEmail);
+      const staffMatch = staffUsers.find(u => u.email.toLowerCase() === cleanEmail);
+
+      if (userMatch) {
+        assignedRole = userMatch.role;
+      } else if (staffMatch) {
+        assignedRole = staffMatch.role;
       } else if (cleanEmail.includes('dapur')) {
         assignedRole = 'manager';
       } else if (cleanEmail.includes('kasir')) {
         assignedRole = 'cashier';
       } else {
+        // All general store loggers default to Store Owner ('owner')
         assignedRole = 'owner';
       }
+    }
+
+    // STRICT GUARD: Double-check that ONLY admin@mavin.id can ever hold saas_admin role
+    if (assignedRole === 'saas_admin' && cleanEmail !== 'admin@mavin.id') {
+      assignedRole = 'owner';
     }
 
     setCurrentRole(assignedRole);
@@ -90,70 +148,77 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         className="modal-content"
         style={{
           maxWidth: '430px',
-          maxHeight: '90vh',
+          maxHeight: '92vh',
           borderRadius: 'var(--radius-lg)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: 'var(--shadow-xl)'
+          boxShadow: 'var(--shadow-xl)',
+          padding: 0
         }}
       >
-        {/* Production Header Banner */}
-        <div style={{
-          background: storeSettings.primaryColor || 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-          padding: '1.5rem 1.5rem',
-          color: 'white',
-          textAlign: 'center',
-          position: 'relative',
-          flexShrink: 0
-        }}>
+        {/* Header Branding */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
+            padding: '1.5rem',
+            color: 'white',
+            textAlign: 'center',
+            position: 'relative'
+          }}
+        >
           <button
             onClick={onClose}
             style={{
               position: 'absolute',
               top: '12px',
               right: '14px',
-              background: 'rgba(255,255,255,0.2)',
+              background: 'rgba(255, 255, 255, 0.2)',
               border: 'none',
               color: 'white',
               width: '26px',
               height: '26px',
               borderRadius: '50%',
               cursor: 'pointer',
-              fontWeight: 800,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
+              fontWeight: 800
             }}
           >
             ✕
           </button>
 
-          <div style={{
-            width: '46px',
-            height: '46px',
-            borderRadius: '12px',
-            background: 'rgba(255,255,255,0.2)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 0.5rem auto',
-            border: '1px solid rgba(255,255,255,0.3)'
-          }}>
-            <Award size={28} />
+          <div
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '12px',
+              background: 'rgba(255, 255, 255, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 0.5rem auto'
+            }}
+          >
+            <Award size={26} color="#ffffff" />
           </div>
 
-          <h2 style={{ color: 'white', fontSize: '1.4rem', marginBottom: '0.15rem' }}>
-            MAVIN SaaS
-          </h2>
-          <p style={{ fontSize: '0.8rem', opacity: 0.9 }}>
-            {mode === 'login' ? 'Masuk ke Platform MAVIN' : 'Daftar Akun UMKM Baru (Free 14-Day Trial)'}
+          <h3 style={{ color: 'white', fontSize: '1.35rem', marginBottom: '0.15rem' }}>
+            {mode === 'login' ? 'Masuk ke Aplikasi MAVIN' : 'Daftar Toko Baru (Trial 14 Hari)'}
+          </h3>
+          <p style={{ fontSize: '0.78rem', color: '#c7d2fe' }}>
+            {mode === 'login'
+              ? 'Silakan masukkan email & password akun toko Anda.'
+              : 'Daftarkan usaha Anda & nikmati akses PRO gratis 14 hari.'}
           </p>
         </div>
 
-        {/* Tab Switcher */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: '#f8fafc', flexShrink: 0 }}>
+        {/* Tab Selector Login vs Register */}
+        <div
+          style={{
+            display: 'flex',
+            borderBottom: '1px solid var(--border-color)',
+            background: '#f8fafc'
+          }}
+        >
           <button
             type="button"
             onClick={() => setMode('login')}
@@ -186,68 +251,91 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               borderBottom: mode === 'register' ? '2px solid var(--primary)' : 'none'
             }}
           >
-            🚀 Daftar Baru (Register)
+            📝 Daftar Toko Baru
           </button>
         </div>
 
-        {/* Scrollable Clean Form Body */}
-        <div style={{ padding: '1.35rem', overflowY: 'auto', flex: 1 }}>
+        {/* Body Form */}
+        <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', flex: 1 }}>
+          {errorMessage && (
+            <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-sm)', color: '#b91c1c', fontSize: '0.8rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <AlertCircle size={16} /> {errorMessage}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             {mode === 'register' && (
               <>
-                <div className="form-group" style={{ marginBottom: 0 }}>
+                <div className="form-group">
                   <label className="form-label">Nama Usaha / Toko *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Kopi Susu Senja"
-                    value={storeNameInput}
-                    onChange={e => setStoreNameInput(e.target.value)}
-                    className="form-control"
-                  />
+                  <div style={{ position: 'relative' }}>
+                    <Building size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Kopi Susu Senja"
+                      value={storeNameInput}
+                      onChange={e => setStoreNameInput(e.target.value)}
+                      className="form-control"
+                      style={{ paddingLeft: '2.2rem' }}
+                    />
+                  </div>
                 </div>
 
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Nama Pemilik Usaha *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Pak Budi"
-                    value={ownerNameInput}
-                    onChange={e => setOwnerNameInput(e.target.value)}
-                    className="form-control"
-                  />
+                <div className="form-group">
+                  <label className="form-label">Nama Pemilik Toko *</label>
+                  <div style={{ position: 'relative' }}>
+                    <User size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Pak Budi"
+                      value={ownerNameInput}
+                      onChange={e => setOwnerNameInput(e.target.value)}
+                      className="form-control"
+                      style={{ paddingLeft: '2.2rem' }}
+                    />
+                  </div>
                 </div>
 
-                <div className="form-group" style={{ marginBottom: 0 }}>
+                <div className="form-group">
                   <label className="form-label">Nomor WhatsApp Aktif *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="0812-XXXX-XXXX"
-                    value={phoneInput}
-                    onChange={e => setPhoneInput(e.target.value)}
-                    className="form-control"
-                  />
+                  <div style={{ position: 'relative' }}>
+                    <Phone size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <input
+                      type="text"
+                      required
+                      placeholder="0812-XXXX-XXXX"
+                      value={phoneInput}
+                      onChange={e => setPhoneInput(e.target.value)}
+                      className="form-control"
+                      style={{ paddingLeft: '2.2rem' }}
+                    />
+                  </div>
                 </div>
               </>
             )}
 
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Alamat Email *</label>
-              <input
-                type="email"
-                required
-                placeholder="nama@toko.id"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                className="form-control"
-              />
+            <div className="form-group">
+              <label className="form-label">Email Akses Login *</label>
+              <div style={{ position: 'relative' }}>
+                <Mail size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  type="email"
+                  required
+                  placeholder="name@store.id"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="form-control"
+                  style={{ paddingLeft: '2.2rem' }}
+                />
+              </div>
             </div>
 
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Kata Sandi (Password) *</label>
+            <div className="form-group">
+              <label className="form-label">Password *</label>
               <div style={{ position: 'relative' }}>
+                <Lock size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
@@ -255,7 +343,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   className="form-control"
-                  style={{ paddingRight: '2.5rem' }}
+                  style={{ paddingLeft: '2.2rem', paddingRight: '2.2rem' }}
                 />
                 <button
                   type="button"
@@ -267,8 +355,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     transform: 'translateY(-50%)',
                     background: 'none',
                     border: 'none',
-                    color: 'var(--text-muted)',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    color: 'var(--text-muted)'
                   }}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -279,19 +367,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <button
               type="submit"
               className="btn btn-primary"
-              style={{ width: '100%', padding: '0.75rem', marginTop: '0.35rem', fontSize: '0.95rem', fontWeight: 800 }}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                fontWeight: 800,
+                fontSize: '0.95rem',
+                marginTop: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}
             >
-              {mode === 'login' ? 'Masuk Sekarang' : 'Daftar & Mulai Trial 14 Hari'} <ArrowRight size={18} />
+              {mode === 'login' ? 'Masuk Sekarang' : 'Daftarkan Toko & Mulai Trial PRO'} <ArrowRight size={18} />
             </button>
           </form>
+        </div>
 
-          {/* Clean Production Footer Info */}
-          <div style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            <span>Butuh bantuan? Hubungi Support MAVIN di </span>
-            <a href="https://wa.me/6281234567890" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', fontWeight: 700, textDecoration: 'none' }}>
-              WhatsApp 24/7
-            </a>
-          </div>
+        {/* Modal Footer Security Note */}
+        <div style={{ background: '#f8fafc', padding: '0.75rem 1.5rem', borderTop: '1px solid var(--border-color)', fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'center' }}>
+          <ShieldCheck size={14} color="#16a34a" /> Disinkronkan dengan Database Multi-Tenant MAVIN
         </div>
       </div>
     </div>

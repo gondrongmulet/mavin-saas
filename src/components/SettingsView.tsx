@@ -193,8 +193,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
   };
 
   const handleSendWhatsAppConfirmation = () => {
+    const waPhone = localStorage.getItem('mavin_saas_admin_wa') || '6281234567890';
     const msg = `Halo Admin MAVIN SaaS, saya ingin konfirmasi pembayaran upgrade Paket ${targetUpgradePlan} untuk toko: ${storeSettings.storeName} (${phone}). Tolong bantu verifikasi mas. Terimakasih!`;
-    const url = `https://wa.me/6281234567890?text=${encodeURIComponent(msg)}`;
+    const url = `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
   };
 
@@ -861,10 +862,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
                     SCAN QRIS DENGAN MANDIRI LIVIN, BCA, GOPAY, OVO, SHOPEEPAY:
                   </div>
 
-                  <div style={{ background: 'white', padding: '0.85rem', borderRadius: '12px', border: '2px solid var(--primary)', marginBottom: '0.85rem', boxShadow: 'var(--shadow-md)' }}>
-                    <QrCode size={180} color="#0f172a" />
+                  <div style={{ background: 'white', padding: '0.85rem', borderRadius: '12px', border: '2px solid var(--primary)', marginBottom: '0.85rem', boxShadow: 'var(--shadow-md)', textAlign: 'center' }}>
+                    {localStorage.getItem('mavin_saas_qris_image') ? (
+                      <img src={localStorage.getItem('mavin_saas_qris_image')!} alt="Barcode QRIS SaaS" style={{ width: '180px', height: '180px', objectFit: 'contain' }} />
+                    ) : (
+                      <QrCode size={180} color="#0f172a" />
+                    )}
                     <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)', marginTop: '0.35rem' }}>
-                      NMID: ID1029384756102
+                      NMID: {localStorage.getItem('mavin_saas_qris_nmid') || 'ID1029384756102'}
                     </div>
                   </div>
 
@@ -893,15 +898,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
                       TRANSFER REKENING BANK RESMI:
                     </div>
                     <div style={{ marginBottom: '0.6rem' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Bank Mandiri:</span>
-                      <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary)' }}>137-00-1234567-8</div>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>a.n. PT MAVIN TEKNOLOGI JUARA</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{localStorage.getItem('mavin_saas_bank1_name') || 'Bank Mandiri'}:</span>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary)' }}>{localStorage.getItem('mavin_saas_bank1_account') || '137-00-1234567-8'}</div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>a.n. {localStorage.getItem('mavin_saas_bank1_owner') || 'PT MAVIN TEKNOLOGI JUARA'}</span>
                     </div>
 
                     <div>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Bank BCA:</span>
-                      <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary)' }}>841-098-7654</div>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>a.n. PT MAVIN TEKNOLOGI JUARA</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{localStorage.getItem('mavin_saas_bank2_name') || 'Bank BCA'}:</span>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary)' }}>{localStorage.getItem('mavin_saas_bank2_account') || '841-098-7654'}</div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>a.n. {localStorage.getItem('mavin_saas_bank2_owner') || 'PT MAVIN TEKNOLOGI JUARA'}</span>
                     </div>
                   </div>
 

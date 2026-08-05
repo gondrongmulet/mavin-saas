@@ -144,19 +144,25 @@ const STORAGE_KEYS = {
   SALES: 'mavin_sales'
 };
 
+const DEFAULT_INITIAL_TENANT: TenantAccount = {
+  id: 'TNT-001',
+  storeName: 'Kopi & Bakery Juara',
+  ownerName: 'Bapak Ahmad',
+  email: 'ahmad@mavin.id',
+  phone: '081234567890',
+  plan: 'Pro',
+  status: 'Aktif',
+  expiryDate: '2026-12-31',
+  monthlyFee: 69000,
+  outletCount: 2,
+  registerDate: '2026-01-15'
+};
+
 function getInitialTenantsList(): TenantAccount[] {
   const savedTenantsStr = localStorage.getItem('mavin_tenants_v5');
   const registeredUsersStr = localStorage.getItem('mavin_registered_users');
   
   let list: TenantAccount[] = savedTenantsStr ? JSON.parse(savedTenantsStr) : [];
-  
-  // Clean filter: Remove old dummy demo stores permanently!
-  list = list.filter(t => 
-    t.email !== 'ahmad@kopisenja.id' && 
-    t.email !== 'ratna@rotijuara.id' && 
-    t.email !== 'hendra@geprek88.id' &&
-    t.email !== 'dewi@estehsolo.id'
-  );
 
   if (registeredUsersStr) {
     try {
@@ -180,7 +186,12 @@ function getInitialTenantsList(): TenantAccount[] {
       });
     } catch (e) {}
   }
-  
+
+  // GUARANTEE: If list is empty, fallback to DEFAULT_INITIAL_TENANT so store list is NEVER 0!
+  if (list.length === 0) {
+    list = [DEFAULT_INITIAL_TENANT];
+  }
+
   localStorage.setItem('mavin_tenants_v5', JSON.stringify(list));
   return list;
 }

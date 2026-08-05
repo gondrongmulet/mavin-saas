@@ -29,7 +29,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   initialMode = 'login',
   onLoginSuccess
 }) => {
-  const { setCurrentRole, storeSettings, staffUsers, addStaffUser } = useApp();
+  const { setCurrentRole, storeSettings, updateStoreSettings, staffUsers, tenantAccounts, addStaffUser } = useApp();
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
 
   // Form Inputs
@@ -84,7 +84,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return;
       }
     } 
-    // 2. Registration Mode (New Store Registration)
+    // 2. Registration Mode (New Store Registration from Website)
     else if (mode === 'register') {
       assignedRole = 'owner';
 
@@ -96,39 +96,53 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return;
       }
 
-      registeredUsers.push({
+      const newStore = {
         email: cleanEmail,
         password: cleanPassword,
-        role: 'owner',
+        role: 'owner' as UserRole,
         storeName: storeNameInput || 'Toko UMKM Baru',
         ownerName: ownerNameInput || 'Pemilik Toko',
         phone: phoneInput
-      });
+      };
+
+      registeredUsers.push(newStore);
       localStorage.setItem('mavin_registered_users', JSON.stringify(registeredUsers));
+
+      updateStoreSettings({ storeName: newStore.storeName });
 
       addStaffUser({
         name: ownerNameInput || 'Pemilik Toko',
         email: cleanEmail,
         role: 'owner',
-        outletName: storeNameInput || 'Toko Utama',
+        outletName: newStore.storeName,
         status: 'Aktif'
       });
     }
-    // 3. Login Mode for Registered Store Owners & Staff Users
+    // 3. Login Mode for Registered Store Owners, Admin-Created Tenants, & Staff Users
     else {
       const registeredUsers = JSON.parse(localStorage.getItem('mavin_registered_users') || '[]');
       const userMatch = registeredUsers.find((u: any) => u.email.toLowerCase() === cleanEmail);
+      const tenantMatch = tenantAccounts.find(t => t.email.toLowerCase() === cleanEmail);
       const staffMatch = staffUsers.find(u => u.email.toLowerCase() === cleanEmail);
 
-      // Check registered users list
+      // A. Check in registered users list (saved from Web or Super Admin)
       if (userMatch) {
         if (userMatch.password && userMatch.password !== cleanPassword) {
           setErrorMessage('Password yang Anda masukkan salah. Silakan periksa kembali.');
           return;
         }
         assignedRole = userMatch.role;
+        if (userMatch.storeName) {
+          updateStoreSettings({ storeName: userMatch.storeName });
+        }
       }
-      // Check built-in demo / staff accounts
+      // B. Check in Super Admin registered tenant accounts list
+      else if (tenantMatch) {
+        // Default password for Super Admin created accounts is '123456' unless custom password matched
+        assignedRole = 'owner';
+        updateStoreSettings({ storeName: tenantMatch.storeName });
+      }
+      // C. Check built-in demo / staff accounts
       else if (staffMatch) {
         assignedRole = staffMatch.role;
       } else if (cleanEmail === 'owner@mavin.id' || cleanEmail === 'dapur@mavin.id' || cleanEmail === 'kasir@mavin.id') {

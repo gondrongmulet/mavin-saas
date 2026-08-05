@@ -1,12 +1,21 @@
 -- ========================================================
--- MAVIN SaaS Enterprise - Supabase Multi-Tenant Database Schema
--- Row Level Security (RLS) Enabled for 100% Tenant Isolation
+-- MAVIN SaaS Enterprise - Supabase PostgreSQL Database Schema
+-- Multi-Tenant Database Architecture with Row Level Security
 -- ========================================================
 
--- 1. Enable UUID Extension
+-- Enable UUID Extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 2. Tenants Table (Daftar UMKM Berlangganan)
+-- Drop existing tables if re-running
+DROP TABLE IF EXISTS sales_transactions CASCADE;
+DROP TABLE IF EXISTS productions CASCADE;
+DROP TABLE IF EXISTS purchases CASCADE;
+DROP TABLE IF EXISTS recipes CASCADE;
+DROP TABLE IF EXISTS ingredients CASCADE;
+DROP TABLE IF EXISTS staff_users CASCADE;
+DROP TABLE IF EXISTS tenants CASCADE;
+
+-- 1. Tenants Table (Daftar Toko / UMKM Berlangganan)
 CREATE TABLE tenants (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     store_name TEXT NOT NULL,
@@ -24,7 +33,7 @@ CREATE TABLE tenants (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 3. Staff Users Table
+-- 2. Staff Users Table
 CREATE TABLE staff_users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
@@ -36,7 +45,7 @@ CREATE TABLE staff_users (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 4. Master Ingredients Table (Stok & WAC HPP)
+-- 3. Master Ingredients Table (Stok & WAC HPP)
 CREATE TABLE ingredients (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
@@ -51,7 +60,7 @@ CREATE TABLE ingredients (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 5. Recipes Catalog Table
+-- 4. Recipes Catalog Table
 CREATE TABLE recipes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
@@ -69,7 +78,7 @@ CREATE TABLE recipes (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 6. Purchases Log Table (Kulakan)
+-- 5. Purchases Log Table (Kulakan)
 CREATE TABLE purchases (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
@@ -80,7 +89,7 @@ CREATE TABLE purchases (
     notes TEXT
 );
 
--- 7. Batch Production Log Table
+-- 6. Batch Production Log Table
 CREATE TABLE productions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
@@ -95,7 +104,7 @@ CREATE TABLE productions (
     notes TEXT
 );
 
--- 8. POS Sales Transactions Table
+-- 7. POS Sales Transactions Table
 CREATE TABLE sales_transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
@@ -115,10 +124,7 @@ CREATE TABLE sales_transactions (
     change NUMERIC(12, 2)
 );
 
--- ========================================================
--- ENABLE ROW LEVEL SECURITY (RLS) FOR MULTI-TENANCY ISOLATION
--- ========================================================
-
+-- Enable RLS
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE staff_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ingredients ENABLE ROW LEVEL SECURITY;
@@ -126,19 +132,3 @@ ALTER TABLE recipes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchases ENABLE ROW LEVEL SECURITY;
 ALTER TABLE productions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_transactions ENABLE ROW LEVEL SECURITY;
-
--- Dynamic RLS Policies (Allow access matching user's tenant_id)
-CREATE POLICY tenant_isolation_ingredients ON ingredients
-    FOR ALL USING (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid);
-
-CREATE POLICY tenant_isolation_recipes ON recipes
-    FOR ALL USING (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid);
-
-CREATE POLICY tenant_isolation_purchases ON purchases
-    FOR ALL USING (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid);
-
-CREATE POLICY tenant_isolation_productions ON productions
-    FOR ALL USING (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid);
-
-CREATE POLICY tenant_isolation_sales ON sales_transactions
-    FOR ALL USING (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid);

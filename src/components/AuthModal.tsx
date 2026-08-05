@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Award,
   Lock,
@@ -31,13 +31,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const { setCurrentRole, storeSettings, staffUsers } = useApp();
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
 
-  // Form states
-  const [email, setEmail] = useState('admin@mavin.id');
-  const [password, setPassword] = useState('superadmin123');
+  // Production Security: All fields default to empty strings!
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [storeNameInput, setStoreNameInput] = useState('');
   const [ownerNameInput, setOwnerNameInput] = useState('');
   const [phoneInput, setPhoneInput] = useState('');
+
+  // Reset form inputs every time the modal opens or mode changes
+  useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode);
+      setEmail('');
+      setPassword('');
+      setStoreNameInput('');
+      setOwnerNameInput('');
+      setPhoneInput('');
+      setShowPassword(false);
+    }
+  }, [isOpen, initialMode]);
 
   if (!isOpen) return null;
 
@@ -225,7 +238,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <input
                 type="email"
                 required
-                placeholder="nama@mavin.id"
+                placeholder="nama@toko.id"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 className="form-control"

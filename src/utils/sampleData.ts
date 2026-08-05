@@ -63,7 +63,13 @@ export const INITIAL_STORE_SETTINGS: StoreSettings = {
   logoIcon: 'Award',
   customLogoUrl: '',
   primaryColor: '#4f46e5',
-  appBackground: 'slate'
+  appBackground: 'slate',
+  printerConnectionType: 'bluetooth',
+  printerPaperWidth: '58mm',
+  printerAutoPrint: true,
+  printerShowLogo: true,
+  receiptHeaderMessage: 'Selamat Datang di Toko Kami!',
+  receiptFooterMessage: 'Terima Kasih Atas Kunjungan Anda!\nFollow IG: @mavin.saas'
 };
 
 export const INITIAL_INGREDIENTS: Ingredient[] = [

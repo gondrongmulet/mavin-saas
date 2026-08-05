@@ -59,6 +59,13 @@ export interface StoreSettings {
   customLogoUrl?: string; // Base64 data URL or image URL
   primaryColor: string; // e.g. '#4f46e5'
   appBackground: 'slate' | 'white' | 'cream' | 'mint' | 'sky';
+  // Thermal Printer & Receipt Settings
+  printerConnectionType?: 'bluetooth' | 'usb' | 'web_dialog';
+  printerPaperWidth?: '58mm' | '80mm';
+  printerAutoPrint?: boolean;
+  printerShowLogo?: boolean;
+  receiptHeaderMessage?: string;
+  receiptFooterMessage?: string;
 }
 
 export type IngredientCategory = 'Bahan Utama' | 'Bumbu & Rempah' | 'Cairan & Susu' | 'Kemasan & Stiker' | 'Topping & Hiasan' | 'Lainnya';

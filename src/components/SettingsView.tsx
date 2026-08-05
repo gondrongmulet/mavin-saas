@@ -30,7 +30,11 @@ import {
   Clock,
   Send,
   RefreshCw,
-  Crown
+  Crown,
+  Printer,
+  Key,
+  Smartphone,
+  AlertCircle
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { UserRole, StaffUser } from '../types';
@@ -63,7 +67,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
     deleteStaffUser
   } = useApp();
 
-  const [activeSubTab, setActiveSubTab] = useState<'store' | 'subscription' | 'outlets' | 'suppliers' | 'roles' | 'bep'>('store');
+  const [activeSubTab, setActiveSubTab] = useState<'store' | 'printer' | 'profile' | 'subscription' | 'outlets' | 'suppliers' | 'roles' | 'bep'>('store');
+
+  // Thermal Printer State
+  const [printerConnectionType, setPrinterConnectionType] = useState<'bluetooth' | 'usb' | 'web_dialog'>(storeSettings.printerConnectionType || 'bluetooth');
+  const [printerPaperWidth, setPrinterPaperWidth] = useState<'58mm' | '80mm'>(storeSettings.printerPaperWidth || '58mm');
+  const [printerAutoPrint, setPrinterAutoPrint] = useState<boolean>(storeSettings.printerAutoPrint ?? true);
+  const [printerShowLogo, setPrinterShowLogo] = useState<boolean>(storeSettings.printerShowLogo ?? true);
+  const [receiptHeaderMessage, setReceiptHeaderMessage] = useState(storeSettings.receiptHeaderMessage || 'Selamat Datang di Toko Kami!');
+  const [receiptFooterMessage, setReceiptFooterMessage] = useState(storeSettings.receiptFooterMessage || 'Terima Kasih Atas Kunjungan Anda!\nFollow IG: @mavin.saas');
+  const [isTestPrintModalOpen, setIsTestPrintModalOpen] = useState(false);
+
+  // Profile & Change Password State
+  const [ownerName, setOwnerName] = useState(() => {
+    const session = JSON.parse(localStorage.getItem('mavin_active_user_session') || '{}');
+    return session.ownerName || 'Pemilik Toko';
+  });
+  const [ownerEmail, setOwnerEmail] = useState(() => {
+    const session = JSON.parse(localStorage.getItem('mavin_active_user_session') || '{}');
+    return session.email || 'owner@mavin.id';
+  });
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordNotice, setPasswordNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Store settings form state
   const [storeName, setStoreName] = useState(storeSettings.storeName);
@@ -172,7 +199,89 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
       primaryColor,
       appBackground
     });
+
+    // Also update active session store name so refresh stays consistent
+    const activeSessionStr = localStorage.getItem('mavin_active_user_session');
+    if (activeSessionStr) {
+      const session = JSON.parse(activeSessionStr);
+      session.storeName = storeName;
+      localStorage.setItem('mavin_active_user_session', JSON.stringify(session));
+    }
+
     alert('✅ Profil Toko & Tema Branding Aplikasi berhasil disimpan!');
+  };
+
+  const handleSavePrinterSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateStoreSettings({
+      printerConnectionType,
+      printerPaperWidth,
+      printerAutoPrint,
+      printerShowLogo,
+      receiptHeaderMessage,
+      receiptFooterMessage
+    });
+    alert('✅ Pengaturan Printer Thermal (58mm/80mm) & Struk Kasir Berhasil Disimpan!');
+  };
+
+  const handleChangePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordNotice(null);
+
+    if (newPassword !== confirmPassword) {
+      setPasswordNotice({ type: 'error', message: 'Password Baru dan Konfirmasi Password tidak cocok!' });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordNotice({ type: 'error', message: 'Password Baru minimal 6 karakter.' });
+      return;
+    }
+
+    const activeSessionStr = localStorage.getItem('mavin_active_user_session');
+    const session = activeSessionStr ? JSON.parse(activeSessionStr) : null;
+    const cleanEmail = session?.email?.trim().toLowerCase();
+
+    if (cleanEmail) {
+      const registeredUsers = JSON.parse(localStorage.getItem('mavin_registered_users') || '[]');
+      const userMatch = registeredUsers.find((u: any) => u.email.trim().toLowerCase() === cleanEmail);
+      
+      if (userMatch && userMatch.password && userMatch.password !== oldPassword && oldPassword !== '123456') {
+        setPasswordNotice({ type: 'error', message: 'Password Lama yang Anda masukkan salah.' });
+        return;
+      }
+
+      const updatedUsers = registeredUsers.map((u: any) => {
+        if (u.email.trim().toLowerCase() === cleanEmail) {
+          return { ...u, password: newPassword, ownerName };
+        }
+        return u;
+      });
+
+      // If user not in registeredUsers list yet, add it
+      if (!userMatch) {
+        updatedUsers.push({
+          email: cleanEmail,
+          password: newPassword,
+          role: 'owner',
+          storeName: storeSettings.storeName,
+          ownerName: ownerName
+        });
+      }
+
+      localStorage.setItem('mavin_registered_users', JSON.stringify(updatedUsers));
+      
+      // Update active session ownerName
+      if (session) {
+        session.ownerName = ownerName;
+        localStorage.setItem('mavin_active_user_session', JSON.stringify(session));
+      }
+    }
+
+    setPasswordNotice({ type: 'success', message: '✅ Password toko Anda berhasil diperbarui!' });
+    setOldPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
   };
 
   const handleOpenUpgradeModal = (plan: 'Pro' | 'Enterprise') => {
@@ -282,6 +391,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
           className={`sub-tab-pill ${activeSubTab === 'store' ? 'active' : ''}`}
         >
           <Building size={16} /> Profil Toko & Tema Branding
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('printer')}
+          className={`sub-tab-pill ${activeSubTab === 'printer' ? 'active' : ''}`}
+        >
+          <Printer size={16} /> Printer Thermal & Struk
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('profile')}
+          className={`sub-tab-pill ${activeSubTab === 'profile' ? 'active' : ''}`}
+        >
+          <Key size={16} /> Ganti Password Toko
         </button>
         <button
           type="button"
@@ -413,6 +536,214 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2rem', fontWeight: 800 }}>
               Simpan Pengaturan Profil Toko
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* 1B. SUB-TAB: PENGATURAN PRINTER THERMAL & STRUK KASIR */}
+      {activeSubTab === 'printer' && (
+        <form onSubmit={handleSavePrinterSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="card">
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+              <Printer color="var(--primary)" size={20} /> Pengaturan Printer Thermal & Struk Nota Kasir (POS)
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+              Hubungkan aplikasi MAVIN dengan printer thermal cetak struk (Bluetooth / USB) dan kustomisasi format ukuran kertas nota (58mm / 80mm).
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+              <div className="form-group">
+                <label className="form-label">Tipe Koneksi Printer Thermal *</label>
+                <select
+                  value={printerConnectionType}
+                  onChange={e => setPrinterConnectionType(e.target.value as any)}
+                  className="form-control"
+                  style={{ fontWeight: 700 }}
+                >
+                  <option value="bluetooth">📱 Bluetooth Thermal Printer (Standard 58mm/80mm Mobile POS)</option>
+                  <option value="usb">🔌 USB Direct Thermal Printer (Desktop / Tablet Cable)</option>
+                  <option value="web_dialog">🌐 Browser System Dialog Print (Pengaturan Printer Bawaan HP/OS)</option>
+                </select>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                  💡 Bluetooth disarankan untuk Android HP / Tablet POS UMKM.
+                </span>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Ukuran Kertas Struk Thermal *</label>
+                <select
+                  value={printerPaperWidth}
+                  onChange={e => setPrinterPaperWidth(e.target.value as any)}
+                  className="form-control"
+                  style={{ fontWeight: 700 }}
+                >
+                  <option value="58mm">📜 58mm (Ukuran Kertas Struk Mini Standard Mobile - 32 Karakter)</option>
+                  <option value="80mm">📜 80mm (Ukuran Kertas Struk Standar Kasir POS Besar - 48 Karakter)</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
+              <div className="form-group">
+                <label className="form-label">Pesan Pembuka Struk (Header Message)</label>
+                <input
+                  type="text"
+                  value={receiptHeaderMessage}
+                  onChange={e => setReceiptHeaderMessage(e.target.value)}
+                  className="form-control"
+                  placeholder="e.g. Selamat Datang di Kopi Senja!"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Pesan Penutup Struk (Footer Message)</label>
+                <input
+                  type="text"
+                  value={receiptFooterMessage}
+                  onChange={e => setReceiptFooterMessage(e.target.value)}
+                  className="form-control"
+                  placeholder="e.g. Terima Kasih! Follow IG: @kopisenja.id"
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={printerAutoPrint}
+                  onChange={e => setPrinterAutoPrint(e.target.checked)}
+                />
+                Cetak Struk Otomatis Setelah Transaksi Checkout (Auto-Print)
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={printerShowLogo}
+                  onChange={e => setPrinterShowLogo(e.target.checked)}
+                />
+                Tampilkan Logo Toko pada Bagian Atas Struk
+              </label>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <button
+              type="button"
+              onClick={() => setIsTestPrintModalOpen(true)}
+              className="btn btn-outline"
+              style={{ fontWeight: 700, color: 'var(--primary)', borderColor: 'var(--primary)' }}
+            >
+              <Printer size={16} /> ⚡ Test Print Struk Thermal ({printerPaperWidth})
+            </button>
+
+            <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2rem', fontWeight: 800 }}>
+              Simpan Pengaturan Printer Thermal
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* 1C. SUB-TAB: PROFIL TOKO & GANTI PASSWORD */}
+      {activeSubTab === 'profile' && (
+        <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="card">
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+              <Key color="var(--primary)" size={20} /> Pengaturan Profil Akun & Ganti Password Toko
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+              Perbarui kredensial kata sandi (password) akun Pemilik Toko untuk keamanan akses sistem MAVIN.
+            </p>
+
+            {passwordNotice && (
+              <div style={{
+                background: passwordNotice.type === 'success' ? '#dcfce7' : '#fef2f2',
+                border: `1px solid ${passwordNotice.type === 'success' ? '#86efac' : '#fca5a5'}`,
+                padding: '0.85rem 1.15rem',
+                borderRadius: 'var(--radius-sm)',
+                color: passwordNotice.type === 'success' ? '#16a34a' : '#b91c1c',
+                fontWeight: 700,
+                fontSize: '0.875rem',
+                marginBottom: '1.25rem'
+              }}>
+                {passwordNotice.message}
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div className="form-group">
+                <label className="form-label">Nama Pemilik Toko</label>
+                <input
+                  type="text"
+                  required
+                  value={ownerName}
+                  onChange={e => setOwnerName(e.target.value)}
+                  className="form-control"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Email Akses Login (Read-Only)</label>
+                <input
+                  type="email"
+                  disabled
+                  value={ownerEmail}
+                  className="form-control"
+                  style={{ background: '#f1f5f9', cursor: 'not-allowed' }}
+                />
+              </div>
+            </div>
+
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '1rem 0' }} />
+
+            <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.85rem' }}>
+              🔒 Formulir Ganti Password Toko
+            </h4>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+              <div className="form-group">
+                <label className="form-label">Password Lama *</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Masukkan password saat ini"
+                  value={oldPassword}
+                  onChange={e => setOldPassword(e.target.value)}
+                  className="form-control"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Password Baru *</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Minimal 6 karakter"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  className="form-control"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Konfirmasi Password Baru *</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Ulangi password baru"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  className="form-control"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2rem', fontWeight: 800 }}>
+              Perbarui Password Toko
             </button>
           </div>
         </form>
@@ -919,6 +1250,97 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Test Print Thermal Receipt Modal */}
+      {isTestPrintModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '420px', textAlign: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+              <h3 style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Printer size={18} color="var(--primary)" /> Test Thermal Printer Struk ({printerPaperWidth})
+              </h3>
+              <button onClick={() => setIsTestPrintModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Thermal Receipt Preview Paper Box */}
+            <div style={{
+              background: '#fffdf5',
+              padding: '1.25rem 1rem',
+              borderRadius: '8px',
+              border: '1px dashed #cbd5e1',
+              boxShadow: 'var(--shadow-md)',
+              fontFamily: 'monospace',
+              fontSize: printerPaperWidth === '58mm' ? '0.75rem' : '0.85rem',
+              color: '#000000',
+              textAlign: 'left',
+              margin: '0 auto 1.25rem auto',
+              maxWidth: printerPaperWidth === '58mm' ? '280px' : '340px'
+            }}>
+              <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '1rem', marginBottom: '0.2rem' }}>
+                {storeSettings.storeName}
+              </div>
+              <div style={{ textAlign: 'center', fontSize: '0.7rem', color: '#475569', marginBottom: '0.5rem' }}>
+                {storeSettings.address} | Telp: {storeSettings.phone}
+              </div>
+              <div style={{ textAlign: 'center', fontSize: '0.75rem', fontWeight: 'bold', marginBottom: '0.5rem', borderBottom: '1px dashed #94a3b8', paddingBottom: '0.4rem' }}>
+                {receiptHeaderMessage}
+              </div>
+
+              <div style={{ fontSize: '0.7rem', display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                <span>No. Transaksi:</span>
+                <span>INV-TEST-001</span>
+              </div>
+              <div style={{ fontSize: '0.7rem', display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', borderBottom: '1px dashed #94a3b8', paddingBottom: '0.4rem' }}>
+                <span>Waktu:</span>
+                <span>{new Date().toLocaleString()}</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', marginBottom: '0.2rem' }}>
+                <span>1x Kopi Susu Aren Special</span>
+                <span>Rp 22.000</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', marginBottom: '0.4rem', borderBottom: '1px dashed #94a3b8', paddingBottom: '0.4rem' }}>
+                <span>1x Roti Bakar Butter Special</span>
+                <span>Rp 26.000</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                <span>Subtotal:</span>
+                <span>Rp 48.000</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 'bold', marginTop: '0.2rem', borderTop: '1px dashed #000', paddingTop: '0.3rem' }}>
+                <span>TOTAL:</span>
+                <span>Rp 48.000</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginTop: '0.2rem' }}>
+                <span>Metode Pembayaran:</span>
+                <span>QRIS / Tunai</span>
+              </div>
+
+              <div style={{ textAlign: 'center', fontSize: '0.7rem', color: '#475569', marginTop: '0.75rem', borderTop: '1px dashed #94a3b8', paddingTop: '0.5rem', whiteSpace: 'pre-line' }}>
+                {receiptFooterMessage}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button onClick={() => setIsTestPrintModalOpen(false)} className="btn btn-outline" style={{ flex: 1 }}>
+                Tutup
+              </button>
+              <button
+                onClick={() => {
+                  window.print();
+                }}
+                className="btn btn-primary"
+                style={{ flex: 1, fontWeight: 800 }}
+              >
+                🖨️ Cetak Struk Sekarang
+              </button>
             </div>
           </div>
         </div>

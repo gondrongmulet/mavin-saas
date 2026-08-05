@@ -161,8 +161,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           updateStoreSettings({ storeName: userMatch.storeName });
         }
       }
-      // B. Check in Super Admin registered tenant accounts list
+      // B. Check in cloud-synced tenant accounts list (fallback when localStorage is not yet populated)
       else if (tenantMatch) {
+        if (cleanPassword !== '123456') {
+          setErrorMessage('Password yang Anda masukkan salah. Silakan periksa kembali.');
+          return;
+        }
         assignedRole = 'owner';
         updateStoreSettings({ storeName: tenantMatch.storeName });
       }

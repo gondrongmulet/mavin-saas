@@ -31,7 +31,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onLoginSuccess,
   allowClose = true
 }) => {
-  const { setCurrentRole, storeSettings, updateStoreSettings, staffUsers, tenantAccounts, addStaffUser, clearStoreDataForNewTenant } = useApp();
+  const { setCurrentRole, storeSettings, updateStoreSettings, staffUsers, tenantAccounts, addTenantAccount, addStaffUser, clearStoreDataForNewTenant } = useApp();
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
 
   // Form Inputs
@@ -98,26 +98,43 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return;
       }
 
+      const newStoreName = storeNameInput.trim() || 'Toko UMKM Baru';
+      const newOwnerName = ownerNameInput.trim() || 'Pemilik Toko';
+
       const newStore = {
         email: cleanEmail,
         password: cleanPassword,
         role: 'owner' as UserRole,
-        storeName: storeNameInput || 'Toko UMKM Baru',
-        ownerName: ownerNameInput || 'Pemilik Toko',
+        storeName: newStoreName,
+        ownerName: newOwnerName,
         phone: phoneInput
       };
 
       registeredUsers.push(newStore);
       localStorage.setItem('mavin_registered_users', JSON.stringify(registeredUsers));
 
-      updateStoreSettings({ storeName: newStore.storeName });
+      // Also register to SaaS Tenant list so Super Admin sees the new registered store!
+      addTenantAccount({
+        storeName: newStoreName,
+        ownerName: newOwnerName,
+        email: cleanEmail,
+        phone: phoneInput || '08123456789',
+        plan: 'Pro',
+        status: 'Aktif',
+        expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        monthlyFee: 69000,
+        outletCount: 2,
+        registerDate: new Date().toISOString().split('T')[0]
+      });
+
+      updateStoreSettings({ storeName: newStoreName });
       clearStoreDataForNewTenant();
 
       addStaffUser({
-        name: ownerNameInput || 'Pemilik Toko',
+        name: newOwnerName,
         email: cleanEmail,
         role: 'owner',
-        outletName: newStore.storeName,
+        outletName: newStoreName,
         status: 'Aktif'
       });
     }
@@ -142,7 +159,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
       // B. Check in Super Admin registered tenant accounts list
       else if (tenantMatch) {
-        // Allow login if password is '123456' or matches custom password
         assignedRole = 'owner';
         updateStoreSettings({ storeName: tenantMatch.storeName });
       }
@@ -163,6 +179,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (assignedRole === 'saas_admin' && cleanEmail !== 'admin@mavin.id') {
       assignedRole = 'owner';
     }
+
+    // Write persistent user session BEFORE updating state!
+    const activeStoreName = assignedRole === 'saas_admin'
+      ? 'MAVIN SaaS Master'
+      : (storeNameInput || storeSettings.storeName || 'Toko UMKM');
+
+    localStorage.setItem('mavin_is_logged_in', 'true');
+    localStorage.setItem('mavin_active_user_session', JSON.stringify({
+      email: cleanEmail,
+      storeName: activeStoreName,
+      ownerName: ownerNameInput || 'Pemilik Toko',
+      role: assignedRole
+    }));
 
     setCurrentRole(assignedRole);
     onLoginSuccess(assignedRole);

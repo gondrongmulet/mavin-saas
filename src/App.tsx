@@ -41,17 +41,23 @@ export function AppContent() {
 
   const { currentRole, setCurrentRole, hasTabAccess, storeSettings, updateStoreSettings } = useApp();
 
-  // Restore active user session & store name on refresh
+  // Restore active user session & store name & active tab on refresh
   useEffect(() => {
     const sessionStr = localStorage.getItem('mavin_active_user_session');
-    if (sessionStr) {
+    const isLoggedInSaved = localStorage.getItem('mavin_is_logged_in') === 'true';
+
+    if (isLoggedInSaved && sessionStr) {
       try {
         const session = JSON.parse(sessionStr);
+        setViewMode('app');
         if (session.storeName && session.storeName !== storeSettings.storeName) {
           updateStoreSettings({ storeName: session.storeName });
         }
-        if (session.role && session.role !== currentRole) {
+        if (session.role) {
           setCurrentRole(session.role);
+          if (session.role === 'saas_admin') {
+            setActiveTab('saas_admin');
+          }
         }
       } catch (e) {
         console.warn('Session parse error:', e);

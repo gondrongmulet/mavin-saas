@@ -156,7 +156,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onOpenAuth, on
             className="btn btn-outline"
             style={{ padding: '0.85rem 1.6rem', fontSize: '1.05rem', fontWeight: 700 }}
           >
-            🚀 Demo Langsung
+            🚀 Demo Simulasi Toko
           </button>
         </div>
       </section>
@@ -446,7 +446,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onOpenAuth, on
           <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem', alignItems: 'center' }}>
             <button onClick={handleDownloadApk} style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', fontWeight: 700 }}>📱 Download APK</button>
             <button onClick={() => onOpenAuth('login')} style={{ background: 'none', border: 'none', color: '#38bdf8', cursor: 'pointer' }}>Masuk (Login)</button>
-            <button onClick={() => onEnterApp('owner')} style={{ background: 'none', border: 'none', color: '#38bdf8', cursor: 'pointer' }}>Demo Aplikasi</button>
+            <button onClick={() => onEnterApp('owner')} style={{ background: 'none', border: 'none', color: '#38bdf8', cursor: 'pointer' }}>Demo Toko</button>
           </div>
         </div>
       </footer>

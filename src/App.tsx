@@ -66,6 +66,7 @@ export function AppContent() {
   };
 
   const handleLoginSuccess = (role: UserRole) => {
+    setCurrentRole(role);
     setViewMode('app');
     if (role === 'cashier') setActiveTab('pos');
     else if (role === 'manager') setActiveTab('recipes');
@@ -74,7 +75,8 @@ export function AppContent() {
   };
 
   const handleLogout = () => {
-    // Return to public Landing Page upon logout
+    // Reset role to default owner upon logout & return to public Landing Page
+    setCurrentRole('owner');
     setViewMode('landing');
     setIsAuthOpen(false);
   };
@@ -85,7 +87,6 @@ export function AppContent() {
         <LandingPageView
           onOpenAuth={handleOpenAuth}
           onEnterApp={(role) => {
-            setCurrentRole(role);
             handleLoginSuccess(role);
           }}
         />

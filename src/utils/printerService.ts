@@ -1,6 +1,6 @@
 // ============================================================
 // MAVIN Thermal Printer Service
-// Direct In-Page Print Spooler & Web Bluetooth Printing for Android APK & Web
+// Direct Bluetooth ESC/POS Driver, System Spooler & Web Share Printing
 // ============================================================
 
 export interface PrintOptions {
@@ -23,6 +23,68 @@ export interface PrintOptions {
   footerNote?: string;
 }
 
+// 1. Direct Web Bluetooth ESC/POS Thermal Printing (Connects directly to paired Bluetooth POS Printer!)
+export async function printDirectBluetoothESC(options?: PrintOptions): Promise<boolean> {
+  const nav = navigator as any;
+  if (!nav.bluetooth) return false;
+
+  try {
+    const device = await nav.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: [
+        '000018f0-0000-1000-8000-00005f9b34fb',
+        '00001101-0000-1000-8000-00005f9b34fb',
+        'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+        '0000ff00-0000-1000-8000-00005f9b34fb',
+        '49535343-fe7d-4ae5-8fa9-9fafd205e455'
+      ]
+    });
+
+    const server = await device.gatt.connect();
+    const services = await server.getPrimaryServices();
+    let targetChar: any = null;
+
+    for (const service of services) {
+      const chars = await service.getCharacteristics();
+      for (const c of chars) {
+        if (c.properties.write || c.properties.writeWithoutResponse) {
+          targetChar = c;
+          break;
+        }
+      }
+      if (targetChar) break;
+    }
+
+    if (!targetChar) {
+      await device.gatt.disconnect();
+      return false;
+    }
+
+    // Convert formatted plain text receipt to ESC/POS bytes
+    const text = formatPlainTextReceipt(options);
+    const encoder = new TextEncoder();
+    const initCmd = new Uint8Array([0x1b, 0x40]); // ESC @ (Reset)
+    const feedCutCmd = new Uint8Array([0x0a, 0x0a, 0x0a, 0x1d, 0x56, 0x41, 0x03]); // Feed & Cut
+
+    await targetChar.writeValue(initCmd);
+    const textBytes = encoder.encode(text);
+
+    // Write in chunks of 100 bytes
+    for (let i = 0; i < textBytes.length; i += 100) {
+      const chunk = textBytes.slice(i, i + 100);
+      await targetChar.writeValue(chunk);
+    }
+    await targetChar.writeValue(feedCutCmd);
+
+    await device.gatt.disconnect();
+    return true;
+  } catch (e) {
+    console.warn('[PrinterService] Direct Bluetooth print error/cancelled:', e);
+    return false;
+  }
+}
+
+// 2. In-Page System Spooler Printing (Clean hidden iframe print without popups/browser tabs)
 export function printReceipt(elementId: string, options?: PrintOptions): void {
   const el = document.getElementById(elementId);
   const contentHtml = el ? el.innerHTML : '';
@@ -34,7 +96,7 @@ export function printReceipt(elementId: string, options?: PrintOptions): void {
     existingIframe.remove();
   }
 
-  // Create a hidden in-page iframe (NEVER opens external browser windows or about:blank tabs!)
+  // Create a hidden in-page iframe
   const iframe = document.createElement('iframe');
   iframe.id = 'mavin-print-iframe';
   iframe.style.position = 'fixed';
@@ -91,7 +153,6 @@ export function printReceipt(elementId: string, options?: PrintOptions): void {
   `);
   doc.close();
 
-  // Clean up iframe after printing completes
   setTimeout(() => {
     if (document.body.contains(iframe)) {
       document.body.removeChild(iframe);
@@ -149,7 +210,7 @@ export function formatPlainTextReceipt(options?: PrintOptions): string {
   if (options.footerNote) {
     txt += centerText(options.footerNote, width) + '\n';
   }
-  txt += '\n\n\n'; // Feed paper
+  txt += '\n\n\n';
   return txt;
 }
 

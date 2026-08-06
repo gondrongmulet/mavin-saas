@@ -12,7 +12,7 @@ import {
 import { useApp } from '../context/AppContext';
 import type { SaleTransaction, SaleItem } from '../types';
 import { calculateRecipeHppDetails, formatIdr } from '../utils/calculator';
-import { printReceipt } from '../utils/printerService';
+import { printReceipt, printDirectBluetoothESC } from '../utils/printerService';
 
 export const PosView: React.FC = () => {
   const { recipes, ingredients, addSaleTransaction, storeSettings } = useApp();
@@ -450,14 +450,14 @@ export const PosView: React.FC = () => {
               </div>
             </div>
 
-            <div className="modal-footer">
+            <div className="modal-footer" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               <button type="button" onClick={handleSendWhatsApp} className="btn btn-emerald" style={{ background: '#25D366' }}>
                 <Send size={16} /> WhatsApp Struk
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  printReceipt('printable-receipt', {
+                onClick={async () => {
+                  const opts = {
                     storeName: storeSettings.storeName,
                     items: completedSale.items,
                     subtotal: completedSale.subtotal,
@@ -470,13 +470,17 @@ export const PosView: React.FC = () => {
                     invoiceNo: completedSale.invoiceNo,
                     date: completedSale.date,
                     paperWidth: storeSettings.printerPaperWidth,
-                    connectionType: storeSettings.printerConnectionType,
                     footerNote: storeSettings.footerNote
-                  });
+                  };
+                  const ok = await printDirectBluetoothESC(opts);
+                  if (!ok) {
+                    printReceipt('printable-receipt', opts);
+                  }
                 }}
                 className="btn btn-primary"
+                style={{ background: '#4f46e5' }}
               >
-                <Printer size={16} /> Cetak Struk
+                <Printer size={16} /> Cetak Bluetooth POS
               </button>
             </div>
           </div>

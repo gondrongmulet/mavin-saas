@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   LayoutDashboard,
   Boxes,
@@ -21,7 +21,9 @@ import {
   LogOut,
   Smartphone,
   Moon,
-  Sun
+  Sun,
+  Menu,
+  X
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { UserRole } from '../types';
@@ -90,47 +92,86 @@ export const Sidebar: React.FC<NavigationProps> = ({ activeTab, setActiveTab, on
     { id: 'settings', label: '⚙️ Konfigurasi Sistem', shortLabel: 'Setting', icon: <Settings size={20} /> },
   ];
 
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+
   // Select navigation list cleanly
   const rawNavItems = currentRole === 'saas_admin' ? saasAdminNavItems : storeNavItems;
   const navItems = rawNavItems.filter(item => hasTabAccess(currentRole, item.id));
-  // Mobile Navigation items priority selection (Always includes Dashboard, POS, Recipes, Ingredients, and Settings!)
-  const storeMobilePriority: NavTab[] = ['dashboard', 'pos', 'recipes', 'ingredients', 'settings'];
-  const mobileNavItems = currentRole === 'saas_admin'
-    ? navItems
-    : storeNavItems.filter(item => storeMobilePriority.includes(item.id));
+  // Mobile Navigation items includes ALL permitted tabs for mobile users
+  const mobileNavItems = navItems;
+
+  const handleTabClick = (tabId: NavTab) => {
+    setActiveTab(tabId);
+    setIsMobileDrawerOpen(false);
+  };
 
   return (
     <>
+      {/* Mobile Drawer Backdrop Overlay */}
+      {isMobileDrawerOpen && (
+        <div
+          onClick={() => setIsMobileDrawerOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.5)',
+            backdropFilter: 'blur(2px)',
+            zIndex: 1999
+          }}
+        />
+      )}
+
       {/* 1. Mobile Top Header Bar */}
       <header className="mobile-top-header">
-        <div
-          onClick={() => setActiveTab(currentRole === 'saas_admin' ? 'saas_admin' : 'settings')}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}
-          title="Klik untuk Pengaturan Profil Toko"
-        >
-          <div style={{
-            width: '34px',
-            height: '34px',
-            borderRadius: '10px',
-            background: currentRole === 'saas_admin' ? '#312e81' : (storeSettings.primaryColor || 'var(--primary)'),
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 800,
-            boxShadow: '0 3px 8px rgba(0, 0, 0, 0.15)',
-            overflow: 'hidden',
-            flexShrink: 0
-          }}>
-            {currentRole === 'saas_admin' ? <Crown size={18} /> : renderLogo(18)}
-          </div>
-          <div>
-            <h2 style={{ fontSize: '0.95rem', lineHeight: '1.1', color: currentRole === 'saas_admin' ? '#312e81' : (storeSettings.primaryColor || 'var(--primary)'), letterSpacing: '0.01em' }}>
-              {currentRole === 'saas_admin' ? 'MAVIN SaaS' : storeSettings.storeName.split(' ')[0]}
-            </h2>
-            <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 700 }}>
-              {currentRole === 'saas_admin' ? '👑 Master Admin' : currentRole === 'owner' ? '🏢 Pemilik' : currentRole === 'manager' ? '👨‍🍳 Dapur' : '🛒 Kasir'}
-            </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <button
+            onClick={() => setIsMobileDrawerOpen(prev => !prev)}
+            className="btn btn-outline"
+            style={{
+              padding: '0.35rem 0.6rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.3rem',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              color: 'var(--text-main)',
+              borderColor: 'var(--border-color)'
+            }}
+            title="Buka Menu Lengkap"
+          >
+            {isMobileDrawerOpen ? <X size={18} /> : <Menu size={18} />}
+            <span>Menu</span>
+          </button>
+
+          <div
+            onClick={() => handleTabClick(currentRole === 'saas_admin' ? 'saas_admin' : 'settings')}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}
+            title="Klik untuk Pengaturan Profil Toko"
+          >
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '10px',
+              background: currentRole === 'saas_admin' ? '#312e81' : (storeSettings.primaryColor || 'var(--primary)'),
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontWeight: 800,
+              boxShadow: '0 3px 8px rgba(0, 0, 0, 0.15)',
+              overflow: 'hidden',
+              flexShrink: 0
+            }}>
+              {currentRole === 'saas_admin' ? <Crown size={16} /> : renderLogo(16)}
+            </div>
+            <div>
+              <h2 style={{ fontSize: '0.88rem', lineHeight: '1.1', color: currentRole === 'saas_admin' ? '#312e81' : (storeSettings.primaryColor || 'var(--primary)'), letterSpacing: '0.01em', margin: 0 }}>
+                {currentRole === 'saas_admin' ? 'MAVIN SaaS' : storeSettings.storeName.split(' ')[0]}
+              </h2>
+              <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                {currentRole === 'saas_admin' ? '👑 Master' : currentRole === 'owner' ? '🏢 Pemilik' : currentRole === 'manager' ? '👨‍🍳 Dapur' : '🛒 Kasir'}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -138,7 +179,7 @@ export const Sidebar: React.FC<NavigationProps> = ({ activeTab, setActiveTab, on
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
           {currentRole !== 'saas_admin' && (
             <button
-              onClick={() => setActiveTab('settings')}
+              onClick={() => handleTabClick('settings')}
               className="btn btn-outline"
               style={{
                 fontSize: '0.72rem',
@@ -176,8 +217,8 @@ export const Sidebar: React.FC<NavigationProps> = ({ activeTab, setActiveTab, on
         </div>
       </header>
 
-      {/* 2. Desktop Sidebar Component */}
-      <aside className="sidebar" style={{ background: currentRole === 'saas_admin' ? '#f5f3ff' : '#ffffff' }}>
+      {/* 2. Desktop & Mobile Drawer Sidebar Component */}
+      <aside className={`sidebar ${isMobileDrawerOpen ? 'mobile-open' : ''}`} style={{ background: currentRole === 'saas_admin' ? '#f5f3ff' : 'var(--bg-sidebar)' }}>
         {/* Brand Header */}
         <div style={{ padding: '1.1rem 1.25rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -230,7 +271,7 @@ export const Sidebar: React.FC<NavigationProps> = ({ activeTab, setActiveTab, on
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => handleTabClick(item.id)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -343,7 +384,7 @@ export const Sidebar: React.FC<NavigationProps> = ({ activeTab, setActiveTab, on
           return (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => handleTabClick(item.id)}
               className={`mobile-nav-item ${isActive ? 'active' : ''}`}
             >
               {item.icon}

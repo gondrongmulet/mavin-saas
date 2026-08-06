@@ -118,10 +118,19 @@ export async function syncCloudStoreDataSave(payload: StoreDataPayload): Promise
       allStoresData = await res.json() || {};
     }
 
-    allStoresData[storeKey] = {
-      ...(allStoresData[storeKey] || {}),
-      ...payload
+    const existingStore = allStoresData[storeKey] || {};
+
+    // Smart merge: merge incoming payload items with existing cloud items so no device wipes out another's data
+    const mergedPayload: StoreDataPayload = {
+      ingredients: payload.ingredients !== undefined ? mergeById(existingStore.ingredients || [], payload.ingredients) : existingStore.ingredients,
+      recipes: payload.recipes !== undefined ? mergeById(existingStore.recipes || [], payload.recipes) : existingStore.recipes,
+      purchases: payload.purchases !== undefined ? mergeById(existingStore.purchases || [], payload.purchases) : existingStore.purchases,
+      productions: payload.productions !== undefined ? mergeById(existingStore.productions || [], payload.productions) : existingStore.productions,
+      sales: payload.sales !== undefined ? mergeById(existingStore.sales || [], payload.sales) : existingStore.sales,
+      storeSettings: payload.storeSettings ? { ...existingStore.storeSettings, ...payload.storeSettings } : existingStore.storeSettings
     };
+
+    allStoresData[storeKey] = mergedPayload;
 
     await fetch(CLOUD_STORE_DATA_URL, {
       method: 'PUT',

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import {
   Ingredient,
   Recipe,
@@ -202,7 +202,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return getInitialTenantsList();
   });
 
-  // Full 2-way cloud sync on mount: push local→cloud AND pull cloud→local
+  const isInitialSyncedRef = useRef(false);
+
+  // Helper to trigger store data fetch & state update
+  const fetchAndApplyStoreData = useCallback(() => {
+    syncCloudStoreDataFetch().then(data => {
+      if (data) {
+        if (data.ingredients) setIngredients(data.ingredients);
+        if (data.recipes) setRecipes(data.recipes);
+        if (data.purchases) setPurchases(data.purchases);
+        if (data.productions) setProductions(data.productions);
+        if (data.sales) setSales(data.sales);
+        if (data.storeSettings) setStoreSettings(data.storeSettings);
+      }
+      isInitialSyncedRef.current = true;
+    });
+  }, []);
+
+  // Full 2-way cloud sync on mount + 15-second background polling
   useEffect(() => {
     // 1. Sync tenants (2-way merge)
     syncCloudTenantsFetch().then(mergedTenants => {
@@ -213,18 +230,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 2. Sync registered users / login credentials (2-way merge)
     syncCloudUsersFetch();
 
-    // 3. Sync operational store data (ingredients, recipes, purchases, productions, sales)
-    syncCloudStoreDataFetch().then(data => {
-      if (data) {
-        if (data.ingredients && data.ingredients.length > 0) setIngredients(data.ingredients);
-        if (data.recipes && data.recipes.length > 0) setRecipes(data.recipes);
-        if (data.purchases && data.purchases.length > 0) setPurchases(data.purchases);
-        if (data.productions && data.productions.length > 0) setProductions(data.productions);
-        if (data.sales && data.sales.length > 0) setSales(data.sales);
-        if (data.storeSettings) setStoreSettings(data.storeSettings);
-      }
-    });
-  }, []);
+    // 3. Sync operational store data immediately
+    fetchAndApplyStoreData();
+
+    // 4. Poll store data every 15s to keep all devices & web in sync automatically!
+    const syncInterval = setInterval(fetchAndApplyStoreData, 15000);
+    return () => clearInterval(syncInterval);
+  }, [fetchAndApplyStoreData]);
 
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('mavin_dark_mode') === 'true';
@@ -322,27 +334,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.SUPPLIERS, JSON.stringify(suppliers)); }, [suppliers]);
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(storeSettings));
-    syncCloudStoreDataSave({ storeSettings });
+    if (isInitialSyncedRef.current) syncCloudStoreDataSave({ storeSettings });
   }, [storeSettings]);
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.INGREDIENTS, JSON.stringify(ingredients));
-    syncCloudStoreDataSave({ ingredients });
+    if (isInitialSyncedRef.current) syncCloudStoreDataSave({ ingredients });
   }, [ingredients]);
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.RECIPES, JSON.stringify(recipes));
-    syncCloudStoreDataSave({ recipes });
+    if (isInitialSyncedRef.current) syncCloudStoreDataSave({ recipes });
   }, [recipes]);
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PURCHASES, JSON.stringify(purchases));
-    syncCloudStoreDataSave({ purchases });
+    if (isInitialSyncedRef.current) syncCloudStoreDataSave({ purchases });
   }, [purchases]);
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PRODUCTIONS, JSON.stringify(productions));
-    syncCloudStoreDataSave({ productions });
+    if (isInitialSyncedRef.current) syncCloudStoreDataSave({ productions });
   }, [productions]);
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(sales));
-    syncCloudStoreDataSave({ sales });
+    if (isInitialSyncedRef.current) syncCloudStoreDataSave({ sales });
   }, [sales]);
 
   // SaaS Master Admin Actions

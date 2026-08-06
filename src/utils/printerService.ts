@@ -27,24 +27,78 @@ export function printReceipt(elementId: string, options?: PrintOptions): void {
   const isAndroid = /Android/i.test(navigator.userAgent) || Boolean((window as any).Capacitor);
   const connType = options?.connectionType || 'bluetooth';
 
-  // 1. If connectionType is Bluetooth / USB or on Android APK, try RawBT Thermal Printer Intent
+  // 1. If connectionType is Bluetooth / USB or on Android APK, trigger RawBT Bluetooth Thermal Printer Scheme
   if ((connType === 'bluetooth' || connType === 'usb' || isAndroid) && connType !== 'web_dialog') {
     const plainText = formatPlainTextReceipt(options);
     if (plainText) {
+      const base64Text = btoa(unescape(encodeURIComponent(plainText)));
+      
+      // Try RawBT Protocol Anchor Click (Safe for Capacitor Android WebView)
       try {
-        const rawbtUrl = 'intent:' + encodeURIComponent(plainText) + '#Intent;scheme=rawbt;package=ru.a404m.rawbt;end;';
-        window.location.href = rawbtUrl;
+        const rawbtLink = document.createElement('a');
+        rawbtLink.href = 'rawbt:base64,' + base64Text;
+        rawbtLink.style.display = 'none';
+        document.body.appendChild(rawbtLink);
+        rawbtLink.click();
+        
+        setTimeout(() => {
+          if (document.body.contains(rawbtLink)) {
+            document.body.removeChild(rawbtLink);
+          }
+        }, 500);
         return;
       } catch (e) {
-        console.warn('[PrinterService] RawBT intent launch error:', e);
+        console.warn('[PrinterService] RawBT link click error:', e);
       }
     }
   }
 
-  // 2. Fallback to System Print Iframe (Works in Desktop Browser & System Spooler)
+  // 2. System Print Spooler Popup (Works in Android System Spooler & Desktop Browser)
   const el = document.getElementById(elementId);
   const contentHtml = el ? el.innerHTML : '';
+  const paperPx = options?.paperWidth === '80mm' ? '320px' : '230px';
 
+  // Try Window Popup first (Best for Android WebView & Native Print Spoolers)
+  const printWin = window.open('', '_blank', 'width=380,height=600');
+  if (printWin) {
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Struk Nota</title>
+          <style>
+            @page { margin: 0; size: auto; }
+            body {
+              font-family: 'Courier New', Courier, monospace;
+              width: ${paperPx};
+              margin: 0 auto;
+              padding: 10px 6px;
+              font-size: 11px;
+              color: #000;
+              background: #fff;
+            }
+            * { box-sizing: border-box; }
+            img { max-width: 100%; height: auto; }
+            .modal-footer, button, .no-print { display: none !important; }
+          </style>
+        </head>
+        <body>
+          ${contentHtml}
+          <script>
+            window.onload = function() {
+              window.focus();
+              window.print();
+              setTimeout(function() { window.close(); }, 800);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWin.document.close();
+    return;
+  }
+
+  // 3. Fallback to hidden iframe print
   const iframe = document.createElement('iframe');
   iframe.style.position = 'fixed';
   iframe.style.right = '0';
@@ -55,50 +109,43 @@ export function printReceipt(elementId: string, options?: PrintOptions): void {
   document.body.appendChild(iframe);
 
   const doc = iframe.contentWindow?.document;
-  if (!doc) {
-    window.print();
-    return;
+  if (doc) {
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Struk Nota</title>
+          <style>
+            @page { margin: 0; size: auto; }
+            body {
+              font-family: 'Courier New', Courier, monospace;
+              width: ${paperPx};
+              margin: 0 auto;
+              padding: 10px 6px;
+              font-size: 11px;
+              color: #000;
+              background: #fff;
+            }
+            * { box-sizing: border-box; }
+            img { max-width: 100%; height: auto; }
+            .modal-footer, button, .no-print { display: none !important; }
+          </style>
+        </head>
+        <body>
+          ${contentHtml}
+          <script>
+            window.onload = function() {
+              window.focus();
+              window.print();
+              setTimeout(function() { if (window.frameElement) window.frameElement.remove(); }, 1200);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    doc.close();
   }
-
-  const paperPx = options?.paperWidth === '80mm' ? '320px' : '230px';
-
-  doc.open();
-  doc.write(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Struk Nota</title>
-        <style>
-          @page { margin: 0; size: auto; }
-          body {
-            font-family: 'Courier New', Courier, monospace;
-            width: ${paperPx};
-            margin: 0 auto;
-            padding: 10px 6px;
-            font-size: 11px;
-            color: #000;
-            background: #fff;
-          }
-          * { box-sizing: border-box; }
-          img { max-width: 100%; height: auto; }
-          .modal-footer, button, .no-print { display: none !important; }
-        </style>
-      </head>
-      <body>
-        ${contentHtml}
-        <script>
-          window.onload = function() {
-            window.focus();
-            window.print();
-            setTimeout(function() {
-              if (window.frameElement) window.frameElement.remove();
-            }, 1200);
-          };
-        </script>
-      </body>
-    </html>
-  `);
-  doc.close();
 }
 
 function formatPlainTextReceipt(options?: PrintOptions): string {
@@ -151,7 +198,7 @@ function formatPlainTextReceipt(options?: PrintOptions): string {
   if (options.footerNote) {
     txt += centerText(options.footerNote, width) + '\n';
   }
-  txt += '\n\n\n'; // Feed paper for cutter/tear
+  txt += '\n\n\n'; // Feed paper
   return txt;
 }
 

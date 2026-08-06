@@ -142,8 +142,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         status: 'Aktif'
       });
     }
+    let resolvedStoreName = '';
+    let resolvedOwnerName = '';
+
     // 3. Login Mode for Registered Store Owners, Admin-Created Tenants, & Staff Users
-    else {
+    if (mode !== 'register') {
       const registeredUsers = JSON.parse(localStorage.getItem('mavin_registered_users') || '[]');
       const userMatch = registeredUsers.find((u: any) => u.email.trim().toLowerCase() === cleanEmail);
       const tenantMatch = tenantAccounts.find(t => t.email.trim().toLowerCase() === cleanEmail);
@@ -157,9 +160,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           return;
         }
         assignedRole = userMatch.role || 'owner';
-        if (userMatch.storeName) {
-          updateStoreSettings({ storeName: userMatch.storeName });
-        }
+        resolvedStoreName = userMatch.storeName || '';
+        resolvedOwnerName = userMatch.ownerName || '';
       }
       // B. Check in cloud-synced tenant accounts list (fallback when localStorage is not yet populated)
       else if (tenantMatch) {
@@ -168,13 +170,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           return;
         }
         assignedRole = 'owner';
-        updateStoreSettings({ storeName: tenantMatch.storeName });
+        resolvedStoreName = tenantMatch.storeName || '';
+        resolvedOwnerName = tenantMatch.ownerName || '';
       }
       // C. Check built-in demo / staff accounts
       else if (staffMatch) {
         assignedRole = staffMatch.role;
+        resolvedStoreName = staffMatch.outletName || '';
+        resolvedOwnerName = staffMatch.name || '';
       } else if (cleanEmail === 'owner@mavin.id' || cleanEmail === 'dapur@mavin.id' || cleanEmail === 'kasir@mavin.id') {
         assignedRole = cleanEmail.includes('dapur') ? 'manager' : cleanEmail.includes('kasir') ? 'cashier' : 'owner';
+        resolvedStoreName = 'MAVIN Kopi & Bakery';
+        resolvedOwnerName = 'Bapak Ahmad';
       }
       // UNREGISTERED EMAIL: STRICT REJECTION!
       else {
@@ -188,16 +195,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       assignedRole = 'owner';
     }
 
-    // Write persistent user session BEFORE updating state!
-    const activeStoreName = assignedRole === 'saas_admin'
-      ? 'MAVIN SaaS Master'
-      : (storeNameInput || storeSettings.storeName || 'Toko UMKM');
+    // Resolve final storeName and ownerName for session persistence
+    let finalStoreName = 'Toko UMKM';
+    let finalOwnerName = 'Pemilik Toko';
 
+    if (assignedRole === 'saas_admin') {
+      finalStoreName = 'MAVIN SaaS Master';
+      finalOwnerName = 'Super Admin';
+    } else if (mode === 'register') {
+      finalStoreName = storeNameInput.trim() || 'Toko UMKM Baru';
+      finalOwnerName = ownerNameInput.trim() || 'Pemilik Toko';
+    } else {
+      finalStoreName = resolvedStoreName || storeSettings.storeName || 'Toko UMKM';
+      finalOwnerName = resolvedOwnerName || ownerNameInput || 'Pemilik Toko';
+    }
+
+    // Update store settings state
+    if (finalStoreName) {
+      updateStoreSettings({ storeName: finalStoreName });
+    }
+
+    // Write persistent user session BEFORE updating state!
     localStorage.setItem('mavin_is_logged_in', 'true');
     localStorage.setItem('mavin_active_user_session', JSON.stringify({
       email: cleanEmail,
-      storeName: activeStoreName,
-      ownerName: ownerNameInput || 'Pemilik Toko',
+      storeName: finalStoreName,
+      ownerName: finalOwnerName,
       role: assignedRole
     }));
 

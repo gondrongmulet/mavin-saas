@@ -17,7 +17,7 @@ import { Lock, Award, ShieldAlert, ArrowRight } from 'lucide-react';
 
 export function AppContent() {
   // Check active session presence
-  const hasActiveSession = Boolean(localStorage.getItem('mavin_active_user_session')) || localStorage.getItem('mavin_is_logged_in') === 'true';
+  const hasActiveSession = Boolean(localStorage.getItem('mavin_active_user_session')) && localStorage.getItem('mavin_is_logged_in') === 'true';
 
   // Strict Authentication Guard State
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
@@ -154,6 +154,7 @@ export function AppContent() {
   const handleLogout = useCallback(() => {
     setIsLoggedIn(false);
     localStorage.removeItem('mavin_is_logged_in');
+    localStorage.removeItem('mavin_active_user_session');
     setCurrentRole('owner');
 
     if (isNativeApk) {

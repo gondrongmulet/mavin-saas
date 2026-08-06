@@ -1,6 +1,6 @@
 // ============================================================
 // MAVIN Thermal Printer Service
-// Universal Seamless Android APK & Web Printing
+// Triple-Action Thermal Printer Hardware Engine for Android APK
 // ============================================================
 
 export interface PrintOptions {
@@ -23,88 +23,41 @@ export interface PrintOptions {
   footerNote?: string;
 }
 
-// 1. Direct Web Bluetooth ESC/POS Printing
-export async function printDirectBluetoothESC(options?: PrintOptions): Promise<boolean> {
-  const nav = navigator as any;
-
-  if (!nav.bluetooth) {
-    return false;
+export function printReceipt(elementId: string, options?: PrintOptions): void {
+  const plainText = formatPlainTextReceipt(options);
+  if (!plainText) {
+    alert('⚠️ Data nota struk tidak valid.');
+    return;
   }
 
+  const base64Text = btoa(unescape(encodeURIComponent(plainText)));
+
+  // CHANNEL 1: Send directly to Bluetooth Thermal Printer Socket (RawBT Local Server 127.0.0.1:40213)
+  fetch('http://127.0.0.1:40213/print', {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: plainText
+  }).catch(() => {});
+
+  // CHANNEL 2: Launch Android Thermal Printer Intent (intent:base64,...)
   try {
-    const device = await nav.bluetooth.requestDevice({
-      acceptAllDevices: true,
-      optionalServices: [
-        '000018f0-0000-1000-8000-00005f9b34fb',
-        '00001101-0000-1000-8000-00005f9b34fb',
-        'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
-        '0000ff00-0000-1000-8000-00005f9b34fb',
-        '49535343-fe7d-4ae5-8fa9-9fafd205e455'
-      ]
-    });
+    const intentUrl = 'intent:base64,' + base64Text + '#Intent;scheme=rawbt;package=ru.a404m.rawbt;end;';
+    const a = document.createElement('a');
+    a.href = intentUrl;
+    a.target = '_system';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      if (document.body.contains(a)) document.body.removeChild(a);
+    }, 500);
+  } catch (e) {}
 
-    if (!device) return false;
-
-    const server = await device.gatt.connect();
-    const services = await server.getPrimaryServices();
-    let targetChar: any = null;
-
-    for (const service of services) {
-      const chars = await service.getCharacteristics();
-      for (const c of chars) {
-        if (c.properties.write || c.properties.writeWithoutResponse) {
-          targetChar = c;
-          break;
-        }
-      }
-      if (targetChar) break;
-    }
-
-    if (!targetChar) {
-      await device.gatt.disconnect();
-      return false;
-    }
-
-    const text = formatPlainTextReceipt(options);
-    const encoder = new TextEncoder();
-    const initCmd = new Uint8Array([0x1b, 0x40]);
-    const feedCutCmd = new Uint8Array([0x0a, 0x0a, 0x0a, 0x1d, 0x56, 0x41, 0x03]);
-
-    await targetChar.writeValue(initCmd);
-    const textBytes = encoder.encode(text);
-
-    for (let i = 0; i < textBytes.length; i += 100) {
-      const chunk = textBytes.slice(i, i + 100);
-      await targetChar.writeValue(chunk);
-    }
-    await targetChar.writeValue(feedCutCmd);
-
-    await device.gatt.disconnect();
-    return true;
-  } catch (e: any) {
-    console.warn('[PrinterService] Web Bluetooth print error:', e);
-    return false;
-  }
-}
-
-// 2. Seamless Universal Print (No Annoying Alert Boxes!)
-export async function printReceipt(elementId: string, options?: PrintOptions): Promise<void> {
-  // Try Web Bluetooth first if available
-  const nav = navigator as any;
-  if (nav.bluetooth) {
-    const ok = await printDirectBluetoothESC(options);
-    if (ok) return;
-  }
-
-  // Fallback to Native System Print Spooler (window.print)
+  // CHANNEL 3: Trigger Layanan Cetak Android (window.print)
   try {
     window.print();
-  } catch (e) {
-    console.warn('[PrinterService] window.print fallback error:', e);
-  }
+  } catch (e) {}
 }
 
-// 3. Web Share API (Android Native Share Sheet)
 export async function shareReceiptText(options?: PrintOptions): Promise<boolean> {
   const plainText = formatPlainTextReceipt(options);
   if (typeof navigator !== 'undefined' && 'share' in navigator && typeof navigator.share === 'function') {

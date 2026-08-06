@@ -48,8 +48,8 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onOpenAuth, on
 
   const handleDownloadApk = () => {
     const link = document.createElement('a');
-    link.href = '/MAVIN_SaaS_v2.4_Installer.apk';
-    link.download = 'MAVIN_SaaS_v2.4_Installer.apk';
+    link.href = '/MAVIN_SaaS_v2.5_Installer.apk';
+    link.download = 'MAVIN_SaaS_v2.5_Installer.apk';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

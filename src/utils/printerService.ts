@@ -1,6 +1,6 @@
 // ============================================================
 // MAVIN Thermal Printer Service
-// Direct Bluetooth ESC/POS Printing (Zero Third-Party Apps Needed!)
+// Universal Seamless Android APK & Web Printing
 // ============================================================
 
 export interface PrintOptions {
@@ -23,17 +23,15 @@ export interface PrintOptions {
   footerNote?: string;
 }
 
-// Direct Web Bluetooth ESC/POS Thermal Printing (No extra apps needed!)
+// 1. Direct Web Bluetooth ESC/POS Printing
 export async function printDirectBluetoothESC(options?: PrintOptions): Promise<boolean> {
   const nav = navigator as any;
 
   if (!nav.bluetooth) {
-    alert('⚠️ Bluetooth API belum aktif di browser/HP ini. Pastikan Bluetooth & Lokasi HP Anda sudah diaktifkan.');
     return false;
   }
 
   try {
-    // 1. Scan and pick Bluetooth Thermal Printer directly
     const device = await nav.bluetooth.requestDevice({
       acceptAllDevices: true,
       optionalServices: [
@@ -63,21 +61,18 @@ export async function printDirectBluetoothESC(options?: PrintOptions): Promise<b
     }
 
     if (!targetChar) {
-      alert('⚠️ Gagal menemukan saluran cetak (GATT Characteristic) pada printer Bluetooth ini.');
       await device.gatt.disconnect();
       return false;
     }
 
-    // 2. Format plain text receipt and convert to ESC/POS byte stream
     const text = formatPlainTextReceipt(options);
     const encoder = new TextEncoder();
-    const initCmd = new Uint8Array([0x1b, 0x40]); // ESC @ (Initialize Printer)
-    const feedCutCmd = new Uint8Array([0x0a, 0x0a, 0x0a, 0x1d, 0x56, 0x41, 0x03]); // Feed lines & Cut
+    const initCmd = new Uint8Array([0x1b, 0x40]);
+    const feedCutCmd = new Uint8Array([0x0a, 0x0a, 0x0a, 0x1d, 0x56, 0x41, 0x03]);
 
     await targetChar.writeValue(initCmd);
     const textBytes = encoder.encode(text);
 
-    // Send chunks of 100 bytes directly over Bluetooth
     for (let i = 0; i < textBytes.length; i += 100) {
       const chunk = textBytes.slice(i, i + 100);
       await targetChar.writeValue(chunk);
@@ -85,21 +80,31 @@ export async function printDirectBluetoothESC(options?: PrintOptions): Promise<b
     await targetChar.writeValue(feedCutCmd);
 
     await device.gatt.disconnect();
-    alert('✅ Struk berhasil dicetak ke printer Bluetooth!');
     return true;
   } catch (e: any) {
-    if (e.name !== 'NotFoundError') {
-      alert('⚠️ Kendala Bluetooth Printer: ' + (e.message || e));
-    }
+    console.warn('[PrinterService] Web Bluetooth print error:', e);
     return false;
   }
 }
 
-export function printReceipt(elementId: string, options?: PrintOptions): void {
-  // Trigger Direct Bluetooth Print as default
-  printDirectBluetoothESC(options);
+// 2. Seamless Universal Print (No Annoying Alert Boxes!)
+export async function printReceipt(elementId: string, options?: PrintOptions): Promise<void> {
+  // Try Web Bluetooth first if available
+  const nav = navigator as any;
+  if (nav.bluetooth) {
+    const ok = await printDirectBluetoothESC(options);
+    if (ok) return;
+  }
+
+  // Fallback to Native System Print Spooler (window.print)
+  try {
+    window.print();
+  } catch (e) {
+    console.warn('[PrinterService] window.print fallback error:', e);
+  }
 }
 
+// 3. Web Share API (Android Native Share Sheet)
 export async function shareReceiptText(options?: PrintOptions): Promise<boolean> {
   const plainText = formatPlainTextReceipt(options);
   if (typeof navigator !== 'undefined' && 'share' in navigator && typeof navigator.share === 'function') {
@@ -116,10 +121,10 @@ export async function shareReceiptText(options?: PrintOptions): Promise<boolean>
 
   try {
     await navigator.clipboard.writeText(plainText);
-    alert('📋 Teks Struk Nota berhasil disalin ke clipboard!');
+    alert('📋 Teks Struk Nota berhasil disalin!');
     return true;
   } catch (e) {
-    alert('⚠️ Gagal menyalin teks struk.');
+    console.warn('[PrinterService] Clipboard copy error:', e);
   }
   return false;
 }

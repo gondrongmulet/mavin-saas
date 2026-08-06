@@ -59,15 +59,34 @@ export async function syncCloudStoreDataFetch(): Promise<StoreDataPayload | null
     const res = await fetch(CLOUD_STORE_DATA_URL, {
       headers: { 'Accept': 'application/json' }
     });
-    if (!res.ok) return null;
+    let allStoresData: any = {};
+    if (res.ok) {
+      allStoresData = await res.json() || {};
+    }
 
-    const allStoresData = await res.json();
-    if (!allStoresData || typeof allStoresData !== 'object') return null;
+    let cloudData: StoreDataPayload = allStoresData[storeKey] || {};
 
-    const cloudData: StoreDataPayload = allStoresData[storeKey];
-    if (!cloudData) return null;
+    // Smart fallback & migration: if primary key has 0 items, search all store keys for matching ingredients/recipes!
+    if ((!cloudData.ingredients || cloudData.ingredients.length === 0) && (!cloudData.recipes || cloudData.recipes.length === 0)) {
+      const altKeys = Object.keys(allStoresData);
+      for (const altKey of altKeys) {
+        if (altKey !== storeKey) {
+          const altData = allStoresData[altKey];
+          if (altData && ((altData.ingredients && altData.ingredients.length > 0) || (altData.recipes && altData.recipes.length > 0))) {
+            cloudData = {
+              ingredients: mergeById(cloudData.ingredients || [], altData.ingredients || []),
+              recipes: mergeById(cloudData.recipes || [], altData.recipes || []),
+              purchases: mergeById(cloudData.purchases || [], altData.purchases || []),
+              productions: mergeById(cloudData.productions || [], altData.productions || []),
+              sales: mergeById(cloudData.sales || [], altData.sales || []),
+              storeSettings: cloudData.storeSettings || altData.storeSettings
+            };
+          }
+        }
+      }
+    }
 
-    // Merge with local data
+    // Read local storage
     const localIngStr = localStorage.getItem('mavin_ingredients');
     const localRecStr = localStorage.getItem('mavin_recipes');
     const localPurStr = localStorage.getItem('mavin_purchases');
@@ -89,25 +108,67 @@ export async function syncCloudStoreDataFetch(): Promise<StoreDataPayload | null
       storeSettings: cloudData.storeSettings || (localStorage.getItem('mavin_store_settings') ? JSON.parse(localStorage.getItem('mavin_store_settings')!) : undefined)
     };
 
-    // Save to local storage
+    // Save merged to local storage
     if (mergedIngredients.length > 0) localStorage.setItem('mavin_ingredients', JSON.stringify(mergedIngredients));
     if (mergedRecipes.length > 0) localStorage.setItem('mavin_recipes', JSON.stringify(mergedRecipes));
     if (mergedPurchases.length > 0) localStorage.setItem('mavin_purchases', JSON.stringify(mergedPurchases));
     if (mergedProductions.length > 0) localStorage.setItem('mavin_productions', JSON.stringify(mergedProductions));
     if (mergedSales.length > 0) localStorage.setItem('mavin_sales', JSON.stringify(mergedSales));
 
-    // Push merged back to cloud
+    // Immediately push merged payload back to cloud JsonBlob
     allStoresData[storeKey] = mergedPayload;
-    fetch(CLOUD_STORE_DATA_URL, {
+    await fetch(CLOUD_STORE_DATA_URL, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(allStoresData)
-    }).catch(e => console.warn('[CloudSync] Store data push back err:', e));
+    });
 
     return mergedPayload;
   } catch (e) {
     console.warn('[CloudSync] Store data fetch error:', e);
     return null;
+  }
+}
+
+export async function forcePushStoreDataToCloud(): Promise<boolean> {
+  const storeKey = getStoreDataKey();
+  if (!storeKey) return false;
+
+  try {
+    const res = await fetch(CLOUD_STORE_DATA_URL, {
+      headers: { 'Accept': 'application/json' }
+    });
+    let allStoresData: any = {};
+    if (res.ok) {
+      allStoresData = await res.json() || {};
+    }
+
+    const localIngStr = localStorage.getItem('mavin_ingredients');
+    const localRecStr = localStorage.getItem('mavin_recipes');
+    const localPurStr = localStorage.getItem('mavin_purchases');
+    const localProStr = localStorage.getItem('mavin_productions');
+    const localSalStr = localStorage.getItem('mavin_sales');
+    const localSetStr = localStorage.getItem('mavin_store_settings');
+
+    const payload: StoreDataPayload = {
+      ingredients: localIngStr ? JSON.parse(localIngStr) : [],
+      recipes: localRecStr ? JSON.parse(localRecStr) : [],
+      purchases: localPurStr ? JSON.parse(localPurStr) : [],
+      productions: localProStr ? JSON.parse(localProStr) : [],
+      sales: localSalStr ? JSON.parse(localSalStr) : [],
+      storeSettings: localSetStr ? JSON.parse(localSetStr) : undefined
+    };
+
+    allStoresData[storeKey] = payload;
+    await fetch(CLOUD_STORE_DATA_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(allStoresData)
+    });
+    return true;
+  } catch (e) {
+    console.warn('[CloudSync] Force push error:', e);
+    return false;
   }
 }
 

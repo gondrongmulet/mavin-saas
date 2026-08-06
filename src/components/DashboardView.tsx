@@ -10,11 +10,13 @@ import {
   Factory,
   Store,
   ChefHat,
-  Award
+  Award,
+  RefreshCw
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { calculateRecipeHppDetails, formatIdr, formatNumber } from '../utils/calculator';
 import { sendStockAlertWA } from '../utils/wahaService';
+import { forcePushStoreDataToCloud, syncCloudStoreDataFetch } from '../utils/supabaseSync';
 import type { NavTab } from './Sidebar';
 import {
   BarChart,
@@ -68,6 +70,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
     };
   });
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSyncNow = async () => {
+    setIsSyncing(true);
+    const pushed = await forcePushStoreDataToCloud();
+    const fetched = await syncCloudStoreDataFetch();
+    if (pushed || fetched) {
+      alert('⚡ Berhasil menyinkronkan data toko dengan Cloud Database! Semua Device & Web dengan akun ini sudah tersinkronisasi.');
+      window.location.reload();
+    } else {
+      alert('⚠️ Gagal terhubung ke Cloud Database. Pastikan perangkat terhubung ke internet.');
+    }
+    setIsSyncing(false);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
       {lowStockItems.length > 0 && !dismissed && (
@@ -112,7 +129,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
       <div style={{
         background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
         borderRadius: 'var(--radius-lg)',
-        padding: '2rem',
+        padding: '1.75rem 2rem',
         color: 'white',
         boxShadow: 'var(--shadow-lg)',
         display: 'flex',
@@ -128,12 +145,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
           <h1 style={{ color: 'white', fontSize: '1.8rem', marginBottom: '0.35rem' }}>
             MAVIN — Manajemen UMKM Juara
           </h1>
-          <p style={{ color: '#c7d2fe', fontSize: '0.95rem', maxWidth: '600px' }}>
+          <p style={{ color: '#c7d2fe', fontSize: '0.95rem', maxWidth: '600px', margin: 0 }}>
             Aplikasi serba bisa untuk menghitung HPP dinamis, mengelola stok bahan baku kulakan, produksi batch, hingga penjualan POS.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            onClick={handleSyncNow}
+            disabled={isSyncing}
+            className="btn btn-outline"
+            style={{
+              padding: '0.75rem 1.1rem',
+              color: '#ffffff',
+              borderColor: 'rgba(255, 255, 255, 0.4)',
+              background: 'rgba(255, 255, 255, 0.1)',
+              fontWeight: 700
+            }}
+            title="Sinkronkan data lokal device ini ke Cloud Server"
+          >
+            <RefreshCw size={18} className={isSyncing ? 'spin' : ''} />
+            {isSyncing ? 'Proses Sinkron...' : '⚡ Sinkronkan Cloud'}
+          </button>
           <button onClick={() => setActiveTab('pos')} className="btn btn-emerald" style={{ padding: '0.75rem 1.25rem' }}>
             <Store size={18} /> Buka Kasir POS
           </button>

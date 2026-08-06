@@ -48,8 +48,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
   const lowStockItems = ingredients.filter(i => i.stock <= i.minStock && i.minStock > 0);
 
   useEffect(() => {
-    if (lowStockItems.length > 0 && wahaConfig?.enabled && !waSent) {
-      sendStockAlertWA(wahaConfig, storeSettings, lowStockItems);
+    if (lowStockItems.length > 0 && wahaConfig?.enabled && !waSent && storeSettings?.phone) {
+      sendStockAlertWA(lowStockItems, storeSettings.phone, storeSettings.storeName || 'Toko MAVIN');
       setWaSent(true);
     }
   }, [lowStockItems, wahaConfig, storeSettings, waSent]);

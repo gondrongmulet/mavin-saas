@@ -18,83 +18,77 @@ export interface PrintOptions {
   invoiceNo?: string;
   date?: string;
   paperWidth?: '58mm' | '80mm';
-  connectionType?: 'bluetooth' | 'usb' | 'web_dialog';
+  connectionType?: 'bluetooth' | 'usb' | 'web_dialog' | 'share';
   headerNote?: string;
   footerNote?: string;
 }
 
 export function printReceipt(elementId: string, options?: PrintOptions): void {
-  const isAndroid = /Android/i.test(navigator.userAgent) || Boolean((window as any).Capacitor);
   const connType = options?.connectionType || 'bluetooth';
 
-  // 1. If Bluetooth/USB on Android, trigger RawBT intent link
-  if ((connType === 'bluetooth' || connType === 'usb' || isAndroid) && connType !== 'web_dialog') {
+  // Option A: Share formatted text to Bluetooth Printer Driver App (if Web Share API supported and requested)
+  if (connType === 'share' && navigator.share) {
     const plainText = formatPlainTextReceipt(options);
-    if (plainText) {
-      try {
-        const base64Text = btoa(unescape(encodeURIComponent(plainText)));
-        const rawbtLink = document.createElement('a');
-        rawbtLink.href = 'rawbt:base64,' + base64Text;
-        rawbtLink.style.display = 'none';
-        document.body.appendChild(rawbtLink);
-        rawbtLink.click();
-        setTimeout(() => {
-          if (document.body.contains(rawbtLink)) {
-            document.body.removeChild(rawbtLink);
-          }
-        }, 500);
-      } catch (e) {
-        console.warn('[PrinterService] RawBT link click error:', e);
-      }
-    }
+    navigator.share({
+      title: `Struk Nota - ${options?.invoiceNo || 'MAVIN'}`,
+      text: plainText
+    }).catch(err => console.warn('[PrinterService] Web Share error:', err));
+    return;
   }
 
-  // 2. Always trigger System Print Spooler / Printable Frame so user gets print dialog or spooler on any device!
+  // Option B: Native Android & Desktop System Print Spooler (Clean, no ERR_UNKNOWN_URL_SCHEME!)
   const el = document.getElementById(elementId);
   const contentHtml = el ? el.innerHTML : '';
   const paperPx = options?.paperWidth === '80mm' ? '320px' : '230px';
 
-  // Try Window Popup first (Best for Android WebView & Native Print Spoolers)
-  const printWin = window.open('', '_blank', 'width=380,height=600');
-  if (printWin) {
-    printWin.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Struk Nota</title>
-          <style>
-            @page { margin: 0; size: auto; }
-            body {
-              font-family: 'Courier New', Courier, monospace;
-              width: ${paperPx};
-              margin: 0 auto;
-              padding: 10px 6px;
-              font-size: 11px;
-              color: #000;
-              background: #fff;
-            }
-            * { box-sizing: border-box; }
-            img { max-width: 100%; height: auto; }
-            .modal-footer, button, .no-print { display: none !important; }
-          </style>
-        </head>
-        <body>
-          ${contentHtml}
-          <script>
-            window.onload = function() {
-              window.focus();
-              window.print();
-              setTimeout(function() { window.close(); }, 800);
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    printWin.document.close();
-    return;
+  // 1. Try Window Popup Spooler (Best for Mobile WebView & Android Print Manager)
+  try {
+    const printWin = window.open('', '_blank', 'width=380,height=600');
+    if (printWin) {
+      printWin.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Struk Nota ${options?.invoiceNo || ''}</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              @page { margin: 0; size: auto; }
+              body {
+                font-family: 'Courier New', Courier, monospace;
+                width: ${paperPx};
+                margin: 0 auto;
+                padding: 10px 6px;
+                font-size: 11px;
+                color: #000;
+                background: #fff;
+              }
+              * { box-sizing: border-box; }
+              img { max-width: 100%; height: auto; }
+              .modal-footer, button, .no-print { display: none !important; }
+            </style>
+          </head>
+          <body>
+            ${contentHtml}
+            <script>
+              window.onload = function() {
+                window.focus();
+                setTimeout(function() {
+                  window.print();
+                  setTimeout(function() { window.close(); }, 1000);
+                }, 200);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWin.document.close();
+      return;
+    }
+  } catch (e) {
+    console.warn('[PrinterService] Window popup error, falling back to hidden iframe:', e);
   }
 
-  // 3. Fallback to hidden iframe print
+  // 2. Fallback to hidden iframe print
   const iframe = document.createElement('iframe');
   iframe.style.position = 'fixed';
   iframe.style.right = '0';
@@ -144,7 +138,7 @@ export function printReceipt(elementId: string, options?: PrintOptions): void {
   }
 }
 
-function formatPlainTextReceipt(options?: PrintOptions): string {
+export function formatPlainTextReceipt(options?: PrintOptions): string {
   if (!options) return '';
   const width = options.paperWidth === '80mm' ? 48 : 32;
   const line = '='.repeat(width) + '\n';

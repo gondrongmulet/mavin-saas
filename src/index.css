@@ -490,3 +490,46 @@ tr:hover td {
 .spin {
   animation: spin 1s linear infinite;
 }
+
+/* Dark Mode Overrides */
+body.dark-mode {
+  --bg-app: #0f172a;
+  --bg-card: #1e293b;
+  --bg-card-hover: #334155;
+  --bg-sidebar: #1e293b;
+  --primary: #818cf8;
+  --primary-light: #312e81;
+  --primary-hover: #6366f1;
+  --text-main: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-light: #64748b;
+  --border-color: #334155;
+  --border-color-focus: #818cf8;
+  --accent-amber: #fbbf24;
+  --accent-amber-light: #451a0333;
+  --accent-emerald: #34d399;
+  --accent-emerald-light: #064e3b33;
+  --accent-rose: #fb7185;
+  --accent-rose-light: #4c0519ee;
+  
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+}
+
+body.dark-mode input, 
+body.dark-mode select, 
+body.dark-mode textarea {
+  background-color: #1e293b;
+  color: #e2e8f0;
+  border-color: #475569;
+}
+
+body.dark-mode table th {
+  background-color: #334155;
+}
+
+body.dark-mode table td {
+  border-color: #334155;
+}

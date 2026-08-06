@@ -176,3 +176,10 @@ export interface AppMetrics {
   averageMarginPercent: number;
   lowStockCount: number;
 }
+
+export interface WahaConfig {
+  url: string;        // URL server WAHA (e.g. https://waha.example.com)
+  apiKey: string;     // API Key WAHA
+  session: string;    // Session name WAHA
+  enabled: boolean;   // Toggle aktif/nonaktif
+}

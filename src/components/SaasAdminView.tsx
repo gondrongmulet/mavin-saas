@@ -25,12 +25,14 @@ import {
 import { useApp } from '../context/AppContext';
 import { syncCloudUserSave } from '../utils/supabaseSync';
 import { formatIdr } from '../utils/calculator';
-import { TenantAccount } from '../types';
+import { TenantAccount, WahaConfig } from '../types';
+import { testWahaConnection } from '../utils/wahaService';
+import { MessageCircle } from 'lucide-react';
 
 export const SaasAdminView: React.FC = () => {
-  const { tenantAccounts, updateTenantStatus, addTenantAccount, addStaffUser } = useApp();
+  const { tenantAccounts, updateTenantStatus, addTenantAccount, addStaffUser, wahaConfig, updateWahaConfig } = useApp();
 
-  const [activeAdminSubTab, setActiveAdminSubTab] = useState<'tenants' | 'payment_setup'>('tenants');
+  const [activeAdminSubTab, setActiveAdminSubTab] = useState<'tenants' | 'payment_setup' | 'waha_setup'>('tenants');
 
   // Tenant Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -239,6 +241,13 @@ export const SaasAdminView: React.FC = () => {
           className={`sub-tab-pill ${activeAdminSubTab === 'payment_setup' ? 'active' : ''}`}
         >
           <QrCode size={16} /> Setup QRIS & Rekening Bank SaaS
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveAdminSubTab('waha_setup')}
+          className={`sub-tab-pill ${activeAdminSubTab === 'waha_setup' ? 'active' : ''}`}
+        >
+          <MessageCircle size={16} /> WhatsApp WAHA
         </button>
       </div>
 
@@ -568,6 +577,97 @@ export const SaasAdminView: React.FC = () => {
             </button>
           </div>
         </form>
+      )}
+
+      {/* WAHA SETUP TAB */}
+      {activeAdminSubTab === 'waha_setup' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+          <div style={{
+            background: 'var(--bg-card)', borderRadius: 'var(--radius-md)',
+            padding: '1.5rem', border: '1px solid var(--border-color)'
+          }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main)', margin: '0 0 0.5rem' }}>
+              🔗 Konfigurasi Server WAHA
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 1.2rem' }}>
+              Hubungkan server WhatsApp HTTP API (WAHA) untuk mengirim notifikasi otomatis ke pemilik toko.
+            </p>
+            
+            {/* Enable toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>Status:</label>
+              <button
+                type="button"
+                onClick={() => updateWahaConfig({ enabled: !wahaConfig.enabled })}
+                style={{
+                  padding: '0.4rem 1rem', borderRadius: 'var(--radius-full)',
+                  border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600,
+                  background: wahaConfig.enabled ? 'var(--accent-emerald)' : 'var(--text-light)',
+                  color: '#fff', transition: 'all 0.2s'
+                }}
+              >
+                {wahaConfig.enabled ? '✅ Aktif' : '⭕ Nonaktif'}
+              </button>
+            </div>
+
+            {/* URL */}
+            <div style={{ marginBottom: '0.85rem' }}>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.3rem' }}>URL Server WAHA</label>
+              <input
+                type="text"
+                placeholder="https://waha.example.com"
+                value={wahaConfig.url}
+                onChange={e => updateWahaConfig({ url: e.target.value })}
+                style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', fontSize: '0.85rem', color: 'var(--text-main)', background: 'var(--bg-card)' }}
+              />
+            </div>
+
+            {/* API Key */}
+            <div style={{ marginBottom: '0.85rem' }}>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.3rem' }}>API Key</label>
+              <input
+                type="password"
+                placeholder="Masukkan API Key WAHA"
+                value={wahaConfig.apiKey}
+                onChange={e => updateWahaConfig({ apiKey: e.target.value })}
+                style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', fontSize: '0.85rem', color: 'var(--text-main)', background: 'var(--bg-card)' }}
+              />
+            </div>
+
+            {/* Session */}
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.3rem' }}>Nama Session</label>
+              <input
+                type="text"
+                placeholder="default"
+                value={wahaConfig.session}
+                onChange={e => updateWahaConfig({ session: e.target.value })}
+                style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', fontSize: '0.85rem', color: 'var(--text-main)', background: 'var(--bg-card)' }}
+              />
+            </div>
+
+            {/* Test Connection Button */}
+            <button
+              type="button"
+              onClick={async () => {
+                const btn = document.getElementById('test-waha-btn');
+                if (btn) btn.innerText = '⏳ Menguji Koneksi...';
+                const success = await testWahaConnection(wahaConfig);
+                if (btn) btn.innerText = 'Uji Koneksi WAHA';
+                if (success) {
+                  alert('✅ Berhasil terhubung ke server WAHA!');
+                } else {
+                  alert('❌ Gagal terhubung ke server WAHA. Periksa URL dan API Key.');
+                }
+              }}
+              id="test-waha-btn"
+              className="btn btn-outline"
+              style={{ fontWeight: 600, padding: '0.6rem 1.2rem' }}
+            >
+              Uji Koneksi WAHA
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Modal Add New Tenant */}

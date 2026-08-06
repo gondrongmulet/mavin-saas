@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   DollarSign,
   TrendingUp,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { calculateRecipeHppDetails, formatIdr, formatNumber } from '../utils/calculator';
+import { sendStockAlertWA } from '../utils/wahaService';
 import type { NavTab } from './Sidebar';
 import {
   BarChart,
@@ -31,7 +32,10 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) => {
-  const { ingredients, recipes, sales } = useApp();
+  const { ingredients, recipes, sales, storeSettings, wahaConfig, darkMode } = useApp();
+  
+  const [dismissed, setDismissed] = useState(false);
+  const [waSent, setWaSent] = useState(false);
 
   // Metrics Calculations
   const totalRevenue = sales.reduce((sum, s) => sum + s.grandTotal, 0);
@@ -41,6 +45,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
 
   const totalRawMaterialValue = ingredients.reduce((sum, ing) => sum + (ing.stock * ing.costPerUnit), 0);
   const lowStockIngredients = ingredients.filter(i => i.stock <= i.minStock);
+  const lowStockItems = ingredients.filter(i => i.stock <= i.minStock && i.minStock > 0);
+
+  useEffect(() => {
+    if (lowStockItems.length > 0 && wahaConfig?.enabled && !waSent) {
+      sendStockAlertWA(wahaConfig, storeSettings, lowStockItems);
+      setWaSent(true);
+    }
+  }, [lowStockItems, wahaConfig, storeSettings, waSent]);
 
   // Data preparation for charts
   const recipeHppData = recipes.map(recipe => {
@@ -58,6 +70,44 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+      {lowStockItems.length > 0 && !dismissed && (
+        <div style={{
+          background: darkMode ? 'linear-gradient(135deg, #451a03, #4c0519)' : 'linear-gradient(135deg, #fef2f2, #fff7ed)',
+          border: '1px solid #fca5a5',
+          borderRadius: 'var(--radius-md)',
+          padding: '1rem 1.2rem',
+          position: 'relative'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontWeight: 700, color: '#dc2626', fontSize: '0.9rem', marginBottom: '0.4rem' }}>
+                ⚠️ {lowStockItems.length} Bahan Baku Stok Menipis!
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {lowStockItems.slice(0, 5).map(item => (
+                  <span key={item.id} style={{
+                    background: '#fee2e2', color: '#b91c1c',
+                    padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-full)',
+                    fontSize: '0.75rem', fontWeight: 600
+                  }}>
+                    {item.name}: {item.stock} {item.unit}
+                  </span>
+                ))}
+                {lowStockItems.length > 5 && (
+                  <span style={{ fontSize: '0.75rem', color: '#b91c1c', fontWeight: 600 }}>
+                    +{lowStockItems.length - 5} lainnya
+                  </span>
+                )}
+              </div>
+            </div>
+            <button onClick={() => setDismissed(true)} style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: '#b91c1c', fontSize: '1.2rem', padding: '0'
+            }}>×</button>
+          </div>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div style={{
         background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',

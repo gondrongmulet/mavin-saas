@@ -19,7 +19,9 @@ import {
   Utensils,
   Globe,
   LogOut,
-  Smartphone
+  Smartphone,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { UserRole } from '../types';
@@ -34,7 +36,7 @@ interface NavigationProps {
 }
 
 export const Sidebar: React.FC<NavigationProps> = ({ activeTab, setActiveTab, onOpenLanding, onLogout }) => {
-  const { ingredients, resetToSampleData, exportDataJson, currentRole, setCurrentRole, storeSettings, hasTabAccess } = useApp();
+  const { ingredients, resetToSampleData, exportDataJson, currentRole, setCurrentRole, storeSettings, hasTabAccess, darkMode, toggleDarkMode } = useApp();
 
   const lowStockCount = ingredients.filter(i => i.stock <= i.minStock).length;
 
@@ -278,6 +280,25 @@ export const Sidebar: React.FC<NavigationProps> = ({ activeTab, setActiveTab, on
               <Globe size={14} /> Lihat Landing Page SaaS
             </button>
           )}
+
+          <button
+            onClick={toggleDarkMode}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.75rem',
+              width: '100%', padding: '0.7rem 1rem',
+              background: darkMode ? 'var(--primary-light)' : 'transparent',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--text-main)',
+              cursor: 'pointer',
+              fontSize: '0.82rem',
+              fontWeight: 500,
+              transition: 'all 0.2s'
+            }}
+          >
+            {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+            {darkMode ? 'Mode Terang' : 'Mode Gelap'}
+          </button>
 
           {onLogout && (
             <button

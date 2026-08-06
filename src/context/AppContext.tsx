@@ -11,7 +11,8 @@ import {
   StoreSettings,
   RolePermissions,
   StaffUser,
-  TenantAccount
+  TenantAccount,
+  WahaConfig
 } from '../types';
 import {
   INITIAL_INGREDIENTS,
@@ -114,6 +115,14 @@ interface AppContextType {
   // Tenant Management
   addTenantAccount: (tenant: Omit<TenantAccount, 'id'>) => void;
 
+  // Dark Mode
+  darkMode: boolean;
+  toggleDarkMode: () => void;
+
+  // WAHA WhatsApp
+  wahaConfig: WahaConfig;
+  updateWahaConfig: (fields: Partial<WahaConfig>) => void;
+
   // Production actions
   executeProductionBatch: (recipeId: string, batchCount: number, notes?: string) => { success: boolean; message: string };
 
@@ -198,6 +207,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 2. Sync registered users / login credentials (2-way merge)
     syncCloudUsersFetch();
   }, []);
+
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    return localStorage.getItem('mavin_dark_mode') === 'true';
+  });
+
+  // Dark mode: apply class to body + persist
+  useEffect(() => {
+    document.body.classList.toggle('dark-mode', darkMode);
+    localStorage.setItem('mavin_dark_mode', String(darkMode));
+  }, [darkMode]);
+
+  const [wahaConfig, setWahaConfig] = useState<WahaConfig>(() => {
+    const saved = localStorage.getItem('mavin_waha_config');
+    return saved ? JSON.parse(saved) : { url: '', apiKey: '', session: '', enabled: false };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('mavin_waha_config', JSON.stringify(wahaConfig));
+  }, [wahaConfig]);
+
+  const updateWahaConfig = (fields: Partial<WahaConfig>) => {
+    setWahaConfig(prev => ({ ...prev, ...fields }));
+  };
 
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.STAFF);
@@ -309,6 +341,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (role === 'owner' || role === 'saas_admin') return true; // Owner & SaaS Admin have 100% access
     return Boolean(rolePermissions[role]?.[tabId]);
   };
+
+  const toggleDarkMode = () => setDarkMode(prev => !prev);
 
   const addTenantAccount = (tenantData: Omit<TenantAccount, 'id'>) => {
     const newTenant: TenantAccount = { ...tenantData, id: `t-${Date.now()}` };
@@ -617,6 +651,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateTenantStatus,
         staffUsers,
         addTenantAccount,
+        darkMode,
+        toggleDarkMode,
+        wahaConfig,
+        updateWahaConfig,
         addStaffUser,
         updateStaffUser,
         deleteStaffUser,

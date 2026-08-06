@@ -1,6 +1,6 @@
 // ============================================================
 // MAVIN Thermal Printer Service
-// Universal Android APK & Desktop Printing (Web Share & System Spooler)
+// Direct Bluetooth ESC/POS Printing (Zero Third-Party Apps Needed!)
 // ============================================================
 
 export interface PrintOptions {
@@ -23,10 +23,85 @@ export interface PrintOptions {
   footerNote?: string;
 }
 
-// 1. Share formatted receipt text directly to Bluetooth Printer Apps (RawBT, POS Printer, etc.)
+// Direct Web Bluetooth ESC/POS Thermal Printing (No extra apps needed!)
+export async function printDirectBluetoothESC(options?: PrintOptions): Promise<boolean> {
+  const nav = navigator as any;
+
+  if (!nav.bluetooth) {
+    alert('⚠️ Bluetooth API belum aktif di browser/HP ini. Pastikan Bluetooth & Lokasi HP Anda sudah diaktifkan.');
+    return false;
+  }
+
+  try {
+    // 1. Scan and pick Bluetooth Thermal Printer directly
+    const device = await nav.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: [
+        '000018f0-0000-1000-8000-00005f9b34fb',
+        '00001101-0000-1000-8000-00005f9b34fb',
+        'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+        '0000ff00-0000-1000-8000-00005f9b34fb',
+        '49535343-fe7d-4ae5-8fa9-9fafd205e455'
+      ]
+    });
+
+    if (!device) return false;
+
+    const server = await device.gatt.connect();
+    const services = await server.getPrimaryServices();
+    let targetChar: any = null;
+
+    for (const service of services) {
+      const chars = await service.getCharacteristics();
+      for (const c of chars) {
+        if (c.properties.write || c.properties.writeWithoutResponse) {
+          targetChar = c;
+          break;
+        }
+      }
+      if (targetChar) break;
+    }
+
+    if (!targetChar) {
+      alert('⚠️ Gagal menemukan saluran cetak (GATT Characteristic) pada printer Bluetooth ini.');
+      await device.gatt.disconnect();
+      return false;
+    }
+
+    // 2. Format plain text receipt and convert to ESC/POS byte stream
+    const text = formatPlainTextReceipt(options);
+    const encoder = new TextEncoder();
+    const initCmd = new Uint8Array([0x1b, 0x40]); // ESC @ (Initialize Printer)
+    const feedCutCmd = new Uint8Array([0x0a, 0x0a, 0x0a, 0x1d, 0x56, 0x41, 0x03]); // Feed lines & Cut
+
+    await targetChar.writeValue(initCmd);
+    const textBytes = encoder.encode(text);
+
+    // Send chunks of 100 bytes directly over Bluetooth
+    for (let i = 0; i < textBytes.length; i += 100) {
+      const chunk = textBytes.slice(i, i + 100);
+      await targetChar.writeValue(chunk);
+    }
+    await targetChar.writeValue(feedCutCmd);
+
+    await device.gatt.disconnect();
+    alert('✅ Struk berhasil dicetak ke printer Bluetooth!');
+    return true;
+  } catch (e: any) {
+    if (e.name !== 'NotFoundError') {
+      alert('⚠️ Kendala Bluetooth Printer: ' + (e.message || e));
+    }
+    return false;
+  }
+}
+
+export function printReceipt(elementId: string, options?: PrintOptions): void {
+  // Trigger Direct Bluetooth Print as default
+  printDirectBluetoothESC(options);
+}
+
 export async function shareReceiptText(options?: PrintOptions): Promise<boolean> {
   const plainText = formatPlainTextReceipt(options);
-  
   if (typeof navigator !== 'undefined' && 'share' in navigator && typeof navigator.share === 'function') {
     try {
       await navigator.share({
@@ -35,28 +110,18 @@ export async function shareReceiptText(options?: PrintOptions): Promise<boolean>
       });
       return true;
     } catch (e) {
-      console.warn('[PrinterService] Web Share cancelled or error:', e);
+      console.warn('[PrinterService] Web Share error:', e);
     }
   }
 
-  // Fallback: Copy to clipboard if navigator.share is not supported
   try {
     await navigator.clipboard.writeText(plainText);
-    alert('📋 Teks Struk Nota berhasil disalin ke clipboard! Silakan paste di aplikasi Printer Bluetooth (RawBT/POS Printer).');
+    alert('📋 Teks Struk Nota berhasil disalin ke clipboard!');
     return true;
   } catch (e) {
-    console.warn('[PrinterService] Clipboard copy error:', e);
+    alert('⚠️ Gagal menyalin teks struk.');
   }
   return false;
-}
-
-// 2. Direct Window Print (Triggers Android Native System Print Spooler directly)
-export function printReceipt(elementId: string, options?: PrintOptions): void {
-  try {
-    window.print();
-  } catch (e) {
-    console.warn('[PrinterService] window.print error:', e);
-  }
 }
 
 export function formatPlainTextReceipt(options?: PrintOptions): string {

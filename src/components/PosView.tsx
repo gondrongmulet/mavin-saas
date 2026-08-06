@@ -452,34 +452,8 @@ export const PosView: React.FC = () => {
             </div>
 
             <div className="modal-footer" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-              <button type="button" onClick={handleSendWhatsApp} className="btn btn-emerald" style={{ background: '#25D366', fontSize: '0.8rem', padding: '0.5rem 0.8rem' }}>
-                <Send size={15} /> WhatsApp Struk
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  shareReceiptText({
-                    storeName: storeSettings.storeName,
-                    items: completedSale.items,
-                    subtotal: completedSale.subtotal,
-                    taxAmount: completedSale.taxAmount,
-                    discount: completedSale.discount,
-                    grandTotal: completedSale.grandTotal,
-                    cashPaid: completedSale.cashPaid,
-                    change: completedSale.change,
-                    paymentMethod: completedSale.paymentMethod,
-                    invoiceNo: completedSale.invoiceNo,
-                    date: completedSale.date,
-                    paperWidth: storeSettings.printerPaperWidth,
-                    footerNote: storeSettings.footerNote
-                  });
-                }}
-                className="btn btn-secondary"
-                style={{ background: '#0284c7', color: '#fff', fontSize: '0.8rem', padding: '0.5rem 0.8rem' }}
-                title="Kirim teks struk nota ke aplikasi Driver Printer Bluetooth (RawBT/POS Printer)"
-              >
-                <Share size={15} /> Kirim ke Printer App
+              <button type="button" onClick={handleSendWhatsApp} className="btn btn-emerald" style={{ background: '#25D366', fontSize: '0.85rem', padding: '0.6rem 1rem' }}>
+                <Send size={16} /> WhatsApp Struk
               </button>
 
               <button
@@ -502,9 +476,10 @@ export const PosView: React.FC = () => {
                   });
                 }}
                 className="btn btn-primary"
-                style={{ background: '#4f46e5', fontSize: '0.8rem', padding: '0.5rem 0.8rem' }}
+                style={{ background: '#4f46e5', fontSize: '0.85rem', padding: '0.6rem 1rem' }}
+                title="Cetak langsung ke Printer Bluetooth POS tanpa aplikasi tambahan"
               >
-                <Printer size={15} /> Cetak Struk
+                <Printer size={16} /> Cetak Struk (Bluetooth Direct)
               </button>
             </div>
           </div>

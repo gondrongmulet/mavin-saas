@@ -39,6 +39,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { UserRole, StaffUser } from '../types';
 import { formatIdr, formatNumber } from '../utils/calculator';
+import { printReceipt } from '../utils/printerService';
 import type { NavTab } from './Sidebar';
 
 interface SettingsViewProps {
@@ -1269,7 +1270,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
             </div>
 
             {/* Thermal Receipt Preview Paper Box */}
-            <div style={{
+            <div id="test-receipt-printable" style={{
               background: '#fffdf5',
               padding: '1.25rem 1rem',
               borderRadius: '8px',
@@ -1334,7 +1335,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
               </button>
               <button
                 onClick={() => {
-                  window.print();
+                  printReceipt('test-receipt-printable', {
+                    storeName: storeSettings.storeName,
+                    items: [
+                      { name: 'Kopi Susu Aren Special', qty: 1, price: 22000 },
+                      { name: 'Roti Bakar Butter Special', qty: 1, price: 26000 }
+                    ],
+                    grandTotal: 48000,
+                    paymentMethod: 'QRIS / Tunai',
+                    invoiceNo: 'INV-TEST-001',
+                    date: new Date().toLocaleDateString('id-ID'),
+                    paperWidth: printerPaperWidth,
+                    connectionType: printerConnectionType,
+                    headerNote: receiptHeaderMessage,
+                    footerNote: receiptFooterMessage
+                  });
                 }}
                 className="btn btn-primary"
                 style={{ flex: 1, fontWeight: 800 }}

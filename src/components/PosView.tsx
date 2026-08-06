@@ -12,6 +12,7 @@ import {
 import { useApp } from '../context/AppContext';
 import type { SaleTransaction, SaleItem } from '../types';
 import { calculateRecipeHppDetails, formatIdr } from '../utils/calculator';
+import { printReceipt } from '../utils/printerService';
 
 export const PosView: React.FC = () => {
   const { recipes, ingredients, addSaleTransaction, storeSettings } = useApp();
@@ -453,7 +454,28 @@ export const PosView: React.FC = () => {
               <button type="button" onClick={handleSendWhatsApp} className="btn btn-emerald" style={{ background: '#25D366' }}>
                 <Send size={16} /> WhatsApp Struk
               </button>
-              <button type="button" onClick={() => window.print()} className="btn btn-primary">
+              <button
+                type="button"
+                onClick={() => {
+                  printReceipt('printable-receipt', {
+                    storeName: storeSettings.storeName,
+                    items: completedSale.items,
+                    subtotal: completedSale.subtotal,
+                    taxAmount: completedSale.taxAmount,
+                    discount: completedSale.discount,
+                    grandTotal: completedSale.grandTotal,
+                    cashPaid: completedSale.cashPaid,
+                    change: completedSale.change,
+                    paymentMethod: completedSale.paymentMethod,
+                    invoiceNo: completedSale.invoiceNo,
+                    date: completedSale.date,
+                    paperWidth: storeSettings.printerPaperWidth,
+                    connectionType: storeSettings.printerConnectionType,
+                    footerNote: storeSettings.footerNote
+                  });
+                }}
+                className="btn btn-primary"
+              >
                 <Printer size={16} /> Cetak Struk
               </button>
             </div>

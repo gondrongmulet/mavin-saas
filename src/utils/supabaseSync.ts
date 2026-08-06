@@ -23,18 +23,24 @@ function getStoreDataKey(): string {
   if (sessionStr) {
     try {
       const session = JSON.parse(sessionStr);
-      if (session.email) return session.email.trim().toLowerCase();
-      if (session.storeName) return session.storeName.trim().toLowerCase();
+      if (session.email && session.email.trim()) {
+        return 'user_' + session.email.trim().toLowerCase().replace(/[^a-z0-9_@.-]/g, '_');
+      }
+      if (session.storeName && session.storeName.trim()) {
+        return 'store_' + session.storeName.trim().toLowerCase().replace(/[^a-z0-9_@.-]/g, '_');
+      }
     } catch (e) {}
   }
   const settingsStr = localStorage.getItem('mavin_store_settings');
   if (settingsStr) {
     try {
       const settings = JSON.parse(settingsStr);
-      if (settings.storeName) return settings.storeName.trim().toLowerCase();
+      if (settings.storeName && settings.storeName.trim()) {
+        return 'store_' + settings.storeName.trim().toLowerCase().replace(/[^a-z0-9_@.-]/g, '_');
+      }
     } catch (e) {}
   }
-  return 'default_store';
+  return 'global_mavin_store';
 }
 
 // Helper: merge two arrays by `id` field
@@ -47,7 +53,7 @@ function mergeById<T extends { id: string }>(local: T[], cloud: T[]): T[] {
 
 export async function syncCloudStoreDataFetch(): Promise<StoreDataPayload | null> {
   const storeKey = getStoreDataKey();
-  if (!storeKey || storeKey === 'default_store') return null;
+  if (!storeKey) return null;
 
   try {
     const res = await fetch(CLOUD_STORE_DATA_URL, {
@@ -107,7 +113,7 @@ export async function syncCloudStoreDataFetch(): Promise<StoreDataPayload | null
 
 export async function syncCloudStoreDataSave(payload: StoreDataPayload): Promise<void> {
   const storeKey = getStoreDataKey();
-  if (!storeKey || storeKey === 'default_store') return;
+  if (!storeKey) return;
 
   try {
     const res = await fetch(CLOUD_STORE_DATA_URL, {

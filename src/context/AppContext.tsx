@@ -35,23 +35,23 @@ import {
 
 const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
   manager: {
-    dashboard: false,
+    dashboard: true,
     ingredients: true,
     purchases: true,
     recipes: true,
     production: true,
-    pos: false,
-    reports: false,
-    settings: false
+    pos: true,
+    reports: true,
+    settings: true
   },
   cashier: {
-    dashboard: false,
-    ingredients: false,
-    purchases: false,
-    recipes: false,
-    production: false,
+    dashboard: true,
+    ingredients: true,
+    purchases: true,
+    recipes: true,
+    production: true,
     pos: true,
-    reports: false,
+    reports: true,
     settings: false
   }
 };

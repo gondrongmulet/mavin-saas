@@ -27,33 +27,29 @@ export function printReceipt(elementId: string, options?: PrintOptions): void {
   const isAndroid = /Android/i.test(navigator.userAgent) || Boolean((window as any).Capacitor);
   const connType = options?.connectionType || 'bluetooth';
 
-  // 1. If connectionType is Bluetooth / USB or on Android APK, trigger RawBT Bluetooth Thermal Printer Scheme
+  // 1. If Bluetooth/USB on Android, trigger RawBT intent link
   if ((connType === 'bluetooth' || connType === 'usb' || isAndroid) && connType !== 'web_dialog') {
     const plainText = formatPlainTextReceipt(options);
     if (plainText) {
-      const base64Text = btoa(unescape(encodeURIComponent(plainText)));
-      
-      // Try RawBT Protocol Anchor Click (Safe for Capacitor Android WebView)
       try {
+        const base64Text = btoa(unescape(encodeURIComponent(plainText)));
         const rawbtLink = document.createElement('a');
         rawbtLink.href = 'rawbt:base64,' + base64Text;
         rawbtLink.style.display = 'none';
         document.body.appendChild(rawbtLink);
         rawbtLink.click();
-        
         setTimeout(() => {
           if (document.body.contains(rawbtLink)) {
             document.body.removeChild(rawbtLink);
           }
         }, 500);
-        return;
       } catch (e) {
         console.warn('[PrinterService] RawBT link click error:', e);
       }
     }
   }
 
-  // 2. System Print Spooler Popup (Works in Android System Spooler & Desktop Browser)
+  // 2. Always trigger System Print Spooler / Printable Frame so user gets print dialog or spooler on any device!
   const el = document.getElementById(elementId);
   const contentHtml = el ? el.innerHTML : '';
   const paperPx = options?.paperWidth === '80mm' ? '320px' : '230px';

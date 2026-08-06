@@ -128,19 +128,17 @@ export const Sidebar: React.FC<NavigationProps> = ({ activeTab, setActiveTab, on
             onClick={() => setIsMobileDrawerOpen(prev => !prev)}
             className="btn btn-outline"
             style={{
-              padding: '0.35rem 0.6rem',
-              display: 'flex',
+              padding: '0.4rem 0.5rem',
+              display: 'inline-flex',
               alignItems: 'center',
-              gap: '0.3rem',
-              fontSize: '0.78rem',
-              fontWeight: 700,
+              justifyContent: 'center',
               color: 'var(--text-main)',
-              borderColor: 'var(--border-color)'
+              borderColor: 'var(--border-color)',
+              borderRadius: 'var(--radius-sm)'
             }}
-            title="Buka Menu Lengkap"
+            title="Menu Navigasi"
           >
-            {isMobileDrawerOpen ? <X size={18} /> : <Menu size={18} />}
-            <span>Menu</span>
+            {isMobileDrawerOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
 
           <div
@@ -164,38 +162,19 @@ export const Sidebar: React.FC<NavigationProps> = ({ activeTab, setActiveTab, on
             }}>
               {currentRole === 'saas_admin' ? <Crown size={16} /> : renderLogo(16)}
             </div>
-            <div>
-              <h2 style={{ fontSize: '0.88rem', lineHeight: '1.1', color: currentRole === 'saas_admin' ? '#312e81' : (storeSettings.primaryColor || 'var(--primary)'), letterSpacing: '0.01em', margin: 0 }}>
-                {currentRole === 'saas_admin' ? 'MAVIN SaaS' : storeSettings.storeName.split(' ')[0]}
+            <div style={{ maxWidth: '160px', overflow: 'hidden' }}>
+              <h2 style={{ fontSize: '0.9rem', lineHeight: '1.1', color: currentRole === 'saas_admin' ? '#312e81' : (storeSettings.primaryColor || 'var(--primary)'), letterSpacing: '0.01em', margin: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                {currentRole === 'saas_admin' ? 'MAVIN SaaS' : storeSettings.storeName}
               </h2>
-              <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+              <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 700, display: 'block', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                 {currentRole === 'saas_admin' ? '👑 Master' : currentRole === 'owner' ? '🏢 Pemilik' : currentRole === 'manager' ? '👨‍🍳 Dapur' : '🛒 Kasir'}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Mobile Header Logout & Action Buttons */}
+        {/* Mobile Header Logout Button */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          {currentRole !== 'saas_admin' && (
-            <button
-              onClick={() => handleTabClick('settings')}
-              className="btn btn-outline"
-              style={{
-                fontSize: '0.72rem',
-                padding: '0.35rem 0.6rem',
-                color: 'var(--primary)',
-                borderColor: 'var(--primary)',
-                fontWeight: 700,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.25rem'
-              }}
-            >
-              <Settings size={13} /> Setting
-            </button>
-          )}
-
           {onLogout && (
             <button
               onClick={onLogout}

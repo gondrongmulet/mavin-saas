@@ -545,3 +545,29 @@ body.dark-mode table th {
 body.dark-mode table td {
   border-color: #334155;
 }
+
+/* Print Media Styles for Thermal Printers & Android Spooler */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-receipt, #printable-receipt * {
+    visibility: visible;
+  }
+  #printable-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 300px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .modal-footer, button, .no-print {
+    display: none !important;
+  }
+}

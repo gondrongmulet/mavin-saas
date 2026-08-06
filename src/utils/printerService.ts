@@ -1,6 +1,6 @@
 // ============================================================
 // MAVIN Thermal Printer Service
-// Direct Bluetooth ESC/POS Driver, System Spooler & Web Share Printing
+// Universal Android APK & Desktop Printing (Web Share & System Spooler)
 // ============================================================
 
 export interface PrintOptions {
@@ -23,141 +23,49 @@ export interface PrintOptions {
   footerNote?: string;
 }
 
-// 1. Direct Web Bluetooth ESC/POS Thermal Printing (Connects directly to paired Bluetooth POS Printer!)
-export async function printDirectBluetoothESC(options?: PrintOptions): Promise<boolean> {
-  const nav = navigator as any;
-  if (!nav.bluetooth) return false;
+// 1. Share formatted receipt text directly to Bluetooth Printer Apps (RawBT, POS Printer, etc.)
+export async function shareReceiptText(options?: PrintOptions): Promise<boolean> {
+  const plainText = formatPlainTextReceipt(options);
+  
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: `Struk Nota - ${options?.invoiceNo || 'MAVIN'}`,
+        text: plainText
+      });
+      return true;
+    } catch (e) {
+      console.warn('[PrinterService] Web Share cancelled or error:', e);
+    }
+  }
 
+  // Fallback: Copy to clipboard if navigator.share is not supported
   try {
-    const device = await nav.bluetooth.requestDevice({
-      acceptAllDevices: true,
-      optionalServices: [
-        '000018f0-0000-1000-8000-00005f9b34fb',
-        '00001101-0000-1000-8000-00005f9b34fb',
-        'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
-        '0000ff00-0000-1000-8000-00005f9b34fb',
-        '49535343-fe7d-4ae5-8fa9-9fafd205e455'
-      ]
-    });
-
-    const server = await device.gatt.connect();
-    const services = await server.getPrimaryServices();
-    let targetChar: any = null;
-
-    for (const service of services) {
-      const chars = await service.getCharacteristics();
-      for (const c of chars) {
-        if (c.properties.write || c.properties.writeWithoutResponse) {
-          targetChar = c;
-          break;
-        }
-      }
-      if (targetChar) break;
-    }
-
-    if (!targetChar) {
-      await device.gatt.disconnect();
-      return false;
-    }
-
-    // Convert formatted plain text receipt to ESC/POS bytes
-    const text = formatPlainTextReceipt(options);
-    const encoder = new TextEncoder();
-    const initCmd = new Uint8Array([0x1b, 0x40]); // ESC @ (Reset)
-    const feedCutCmd = new Uint8Array([0x0a, 0x0a, 0x0a, 0x1d, 0x56, 0x41, 0x03]); // Feed & Cut
-
-    await targetChar.writeValue(initCmd);
-    const textBytes = encoder.encode(text);
-
-    // Write in chunks of 100 bytes
-    for (let i = 0; i < textBytes.length; i += 100) {
-      const chunk = textBytes.slice(i, i + 100);
-      await targetChar.writeValue(chunk);
-    }
-    await targetChar.writeValue(feedCutCmd);
-
-    await device.gatt.disconnect();
+    await navigator.clipboard.writeText(plainText);
+    alert('📋 Teks Struk Nota berhasil disalin ke clipboard! Silakan paste di aplikasi Printer Bluetooth (RawBT/POS Printer).');
     return true;
   } catch (e) {
-    console.warn('[PrinterService] Direct Bluetooth print error/cancelled:', e);
-    return false;
+    console.warn('[PrinterService] Clipboard copy error:', e);
   }
+  return false;
 }
 
-// 2. In-Page System Spooler Printing (Clean hidden iframe print without popups/browser tabs)
+// 2. Direct Window Print (Triggers Android Native System Print Spooler directly)
 export function printReceipt(elementId: string, options?: PrintOptions): void {
-  const el = document.getElementById(elementId);
-  const contentHtml = el ? el.innerHTML : '';
-  const paperPx = options?.paperWidth === '80mm' ? '320px' : '230px';
-
-  // Remove any previously created hidden print iframe
-  const existingIframe = document.getElementById('mavin-print-iframe');
-  if (existingIframe) {
-    existingIframe.remove();
-  }
-
-  // Create a hidden in-page iframe
-  const iframe = document.createElement('iframe');
-  iframe.id = 'mavin-print-iframe';
-  iframe.style.position = 'fixed';
-  iframe.style.right = '0';
-  iframe.style.bottom = '0';
-  iframe.style.width = '0px';
-  iframe.style.height = '0px';
-  iframe.style.border = '0px';
-  iframe.style.opacity = '0';
-  iframe.style.pointerEvents = 'none';
-  document.body.appendChild(iframe);
-
-  const doc = iframe.contentWindow?.document;
-  if (!doc) {
-    window.print();
+  // If navigator.share is available on mobile/APK, offer share first or fall back to system print
+  const isAndroid = /Android/i.test(navigator.userAgent) || Boolean((window as any).Capacitor);
+  
+  if (isAndroid && navigator.share) {
+    shareReceiptText(options);
     return;
   }
 
-  doc.open();
-  doc.write(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Struk Nota ${options?.invoiceNo || ''}</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-          @page { margin: 0; size: auto; }
-          body {
-            font-family: 'Courier New', Courier, monospace;
-            width: ${paperPx};
-            margin: 0 auto;
-            padding: 10px 6px;
-            font-size: 11px;
-            color: #000;
-            background: #fff;
-          }
-          * { box-sizing: border-box; }
-          img { max-width: 100%; height: auto; }
-          .modal-footer, button, .no-print { display: none !important; }
-        </style>
-      </head>
-      <body>
-        ${contentHtml}
-        <script>
-          window.onload = function() {
-            window.focus();
-            setTimeout(function() {
-              window.print();
-            }, 150);
-          };
-        </script>
-      </body>
-    </html>
-  `);
-  doc.close();
-
-  setTimeout(() => {
-    if (document.body.contains(iframe)) {
-      document.body.removeChild(iframe);
-    }
-  }, 3000);
+  // Fallback to window.print()
+  try {
+    window.print();
+  } catch (e) {
+    console.warn('[PrinterService] window.print error:', e);
+  }
 }
 
 export function formatPlainTextReceipt(options?: PrintOptions): string {

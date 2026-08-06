@@ -7,12 +7,13 @@ import {
   CheckCircle,
   Printer,
   X,
-  Send
+  Send,
+  Share
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import type { SaleTransaction, SaleItem } from '../types';
 import { calculateRecipeHppDetails, formatIdr } from '../utils/calculator';
-import { printReceipt, printDirectBluetoothESC } from '../utils/printerService';
+import { printReceipt, shareReceiptText } from '../utils/printerService';
 
 export const PosView: React.FC = () => {
   const { recipes, ingredients, addSaleTransaction, storeSettings } = useApp();
@@ -450,14 +451,15 @@ export const PosView: React.FC = () => {
               </div>
             </div>
 
-            <div className="modal-footer" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <button type="button" onClick={handleSendWhatsApp} className="btn btn-emerald" style={{ background: '#25D366' }}>
-                <Send size={16} /> WhatsApp Struk
+            <div className="modal-footer" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button type="button" onClick={handleSendWhatsApp} className="btn btn-emerald" style={{ background: '#25D366', fontSize: '0.8rem', padding: '0.5rem 0.8rem' }}>
+                <Send size={15} /> WhatsApp Struk
               </button>
+
               <button
                 type="button"
-                onClick={async () => {
-                  const opts = {
+                onClick={() => {
+                  shareReceiptText({
                     storeName: storeSettings.storeName,
                     items: completedSale.items,
                     subtotal: completedSale.subtotal,
@@ -471,16 +473,38 @@ export const PosView: React.FC = () => {
                     date: completedSale.date,
                     paperWidth: storeSettings.printerPaperWidth,
                     footerNote: storeSettings.footerNote
-                  };
-                  const ok = await printDirectBluetoothESC(opts);
-                  if (!ok) {
-                    printReceipt('printable-receipt', opts);
-                  }
+                  });
+                }}
+                className="btn btn-secondary"
+                style={{ background: '#0284c7', color: '#fff', fontSize: '0.8rem', padding: '0.5rem 0.8rem' }}
+                title="Kirim teks struk nota ke aplikasi Driver Printer Bluetooth (RawBT/POS Printer)"
+              >
+                <Share size={15} /> Kirim ke Printer App
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  printReceipt('printable-receipt', {
+                    storeName: storeSettings.storeName,
+                    items: completedSale.items,
+                    subtotal: completedSale.subtotal,
+                    taxAmount: completedSale.taxAmount,
+                    discount: completedSale.discount,
+                    grandTotal: completedSale.grandTotal,
+                    cashPaid: completedSale.cashPaid,
+                    change: completedSale.change,
+                    paymentMethod: completedSale.paymentMethod,
+                    invoiceNo: completedSale.invoiceNo,
+                    date: completedSale.date,
+                    paperWidth: storeSettings.printerPaperWidth,
+                    footerNote: storeSettings.footerNote
+                  });
                 }}
                 className="btn btn-primary"
-                style={{ background: '#4f46e5' }}
+                style={{ background: '#4f46e5', fontSize: '0.8rem', padding: '0.5rem 0.8rem' }}
               >
-                <Printer size={16} /> Cetak Bluetooth POS
+                <Printer size={15} /> Cetak Struk
               </button>
             </div>
           </div>

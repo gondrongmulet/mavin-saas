@@ -25,7 +25,13 @@ import {
   INITIAL_STORE_SETTINGS
 } from '../utils/sampleData';
 import { calculateRecipeHppDetails } from '../utils/calculator';
-import { syncCloudTenantsFetch, syncCloudTenantSave, syncCloudUsersFetch } from '../utils/supabaseSync';
+import {
+  syncCloudTenantsFetch,
+  syncCloudTenantSave,
+  syncCloudUsersFetch,
+  syncCloudStoreDataFetch,
+  syncCloudStoreDataSave
+} from '../utils/supabaseSync';
 
 const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
   manager: {
@@ -206,6 +212,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     // 2. Sync registered users / login credentials (2-way merge)
     syncCloudUsersFetch();
+
+    // 3. Sync operational store data (ingredients, recipes, purchases, productions, sales)
+    syncCloudStoreDataFetch().then(data => {
+      if (data) {
+        if (data.ingredients && data.ingredients.length > 0) setIngredients(data.ingredients);
+        if (data.recipes && data.recipes.length > 0) setRecipes(data.recipes);
+        if (data.purchases && data.purchases.length > 0) setPurchases(data.purchases);
+        if (data.productions && data.productions.length > 0) setProductions(data.productions);
+        if (data.sales && data.sales.length > 0) setSales(data.sales);
+        if (data.storeSettings) setStoreSettings(data.storeSettings);
+      }
+    });
   }, []);
 
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -295,19 +313,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return isDemoStore ? INITIAL_SALES : [];
   });
 
-  // Sync to LocalStorage
+  // Sync to LocalStorage & Cloud DB
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.ROLE, currentRole); }, [currentRole]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.ROLE_PERMISSIONS, JSON.stringify(rolePermissions)); }, [rolePermissions]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.TENANTS, JSON.stringify(tenantAccounts)); }, [tenantAccounts]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.STAFF, JSON.stringify(staffUsers)); }, [staffUsers]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.OUTLETS, JSON.stringify(outlets)); }, [outlets]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.SUPPLIERS, JSON.stringify(suppliers)); }, [suppliers]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(storeSettings)); }, [storeSettings]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.INGREDIENTS, JSON.stringify(ingredients)); }, [ingredients]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.RECIPES, JSON.stringify(recipes)); }, [recipes]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.PURCHASES, JSON.stringify(purchases)); }, [purchases]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.PRODUCTIONS, JSON.stringify(productions)); }, [productions]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(sales)); }, [sales]);
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(storeSettings));
+    syncCloudStoreDataSave({ storeSettings });
+  }, [storeSettings]);
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.INGREDIENTS, JSON.stringify(ingredients));
+    syncCloudStoreDataSave({ ingredients });
+  }, [ingredients]);
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.RECIPES, JSON.stringify(recipes));
+    syncCloudStoreDataSave({ recipes });
+  }, [recipes]);
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.PURCHASES, JSON.stringify(purchases));
+    syncCloudStoreDataSave({ purchases });
+  }, [purchases]);
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.PRODUCTIONS, JSON.stringify(productions));
+    syncCloudStoreDataSave({ productions });
+  }, [productions]);
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(sales));
+    syncCloudStoreDataSave({ sales });
+  }, [sales]);
 
   // SaaS Master Admin Actions
   const updateTenantStatus = (id: string, status: 'Aktif' | 'Trial' | 'Expired', plan?: 'Starter' | 'Pro' | 'Enterprise') => {

@@ -6,6 +6,132 @@ import { TenantAccount } from '../types';
 // ============================================================
 const CLOUD_TENANTS_URL = 'https://jsonblob.com/api/jsonBlob/019fd236-7dda-7667-b4ad-7913f0ef8bf6';
 const CLOUD_USERS_URL = 'https://jsonblob.com/api/jsonBlob/019fd23b-5ffc-77dd-9e13-8aa3d63c5643';
+const CLOUD_STORE_DATA_URL = 'https://jsonblob.com/api/jsonBlob/019fd501-6e45-7c88-93d6-1b2f6c3dd140';
+
+export interface StoreDataPayload {
+  ingredients?: any[];
+  recipes?: any[];
+  purchases?: any[];
+  productions?: any[];
+  sales?: any[];
+  storeSettings?: any;
+}
+
+// Helper: Get sanitized key for a store
+function getStoreDataKey(): string {
+  const sessionStr = localStorage.getItem('mavin_active_user_session');
+  if (sessionStr) {
+    try {
+      const session = JSON.parse(sessionStr);
+      if (session.email) return session.email.trim().toLowerCase();
+      if (session.storeName) return session.storeName.trim().toLowerCase();
+    } catch (e) {}
+  }
+  const settingsStr = localStorage.getItem('mavin_store_settings');
+  if (settingsStr) {
+    try {
+      const settings = JSON.parse(settingsStr);
+      if (settings.storeName) return settings.storeName.trim().toLowerCase();
+    } catch (e) {}
+  }
+  return 'default_store';
+}
+
+// Helper: merge two arrays by `id` field
+function mergeById<T extends { id: string }>(local: T[], cloud: T[]): T[] {
+  const map = new Map<string, T>();
+  (cloud || []).forEach(item => { if (item && item.id) map.set(item.id, item); });
+  (local || []).forEach(item => { if (item && item.id) map.set(item.id, item); });
+  return Array.from(map.values());
+}
+
+export async function syncCloudStoreDataFetch(): Promise<StoreDataPayload | null> {
+  const storeKey = getStoreDataKey();
+  if (!storeKey || storeKey === 'default_store') return null;
+
+  try {
+    const res = await fetch(CLOUD_STORE_DATA_URL, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) return null;
+
+    const allStoresData = await res.json();
+    if (!allStoresData || typeof allStoresData !== 'object') return null;
+
+    const cloudData: StoreDataPayload = allStoresData[storeKey];
+    if (!cloudData) return null;
+
+    // Merge with local data
+    const localIngStr = localStorage.getItem('mavin_ingredients');
+    const localRecStr = localStorage.getItem('mavin_recipes');
+    const localPurStr = localStorage.getItem('mavin_purchases');
+    const localProStr = localStorage.getItem('mavin_productions');
+    const localSalStr = localStorage.getItem('mavin_sales');
+
+    const mergedIngredients = mergeById(localIngStr ? JSON.parse(localIngStr) : [], cloudData.ingredients || []);
+    const mergedRecipes = mergeById(localRecStr ? JSON.parse(localRecStr) : [], cloudData.recipes || []);
+    const mergedPurchases = mergeById(localPurStr ? JSON.parse(localPurStr) : [], cloudData.purchases || []);
+    const mergedProductions = mergeById(localProStr ? JSON.parse(localProStr) : [], cloudData.productions || []);
+    const mergedSales = mergeById(localSalStr ? JSON.parse(localSalStr) : [], cloudData.sales || []);
+
+    const mergedPayload: StoreDataPayload = {
+      ingredients: mergedIngredients,
+      recipes: mergedRecipes,
+      purchases: mergedPurchases,
+      productions: mergedProductions,
+      sales: mergedSales,
+      storeSettings: cloudData.storeSettings || (localStorage.getItem('mavin_store_settings') ? JSON.parse(localStorage.getItem('mavin_store_settings')!) : undefined)
+    };
+
+    // Save to local storage
+    if (mergedIngredients.length > 0) localStorage.setItem('mavin_ingredients', JSON.stringify(mergedIngredients));
+    if (mergedRecipes.length > 0) localStorage.setItem('mavin_recipes', JSON.stringify(mergedRecipes));
+    if (mergedPurchases.length > 0) localStorage.setItem('mavin_purchases', JSON.stringify(mergedPurchases));
+    if (mergedProductions.length > 0) localStorage.setItem('mavin_productions', JSON.stringify(mergedProductions));
+    if (mergedSales.length > 0) localStorage.setItem('mavin_sales', JSON.stringify(mergedSales));
+
+    // Push merged back to cloud
+    allStoresData[storeKey] = mergedPayload;
+    fetch(CLOUD_STORE_DATA_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(allStoresData)
+    }).catch(e => console.warn('[CloudSync] Store data push back err:', e));
+
+    return mergedPayload;
+  } catch (e) {
+    console.warn('[CloudSync] Store data fetch error:', e);
+    return null;
+  }
+}
+
+export async function syncCloudStoreDataSave(payload: StoreDataPayload): Promise<void> {
+  const storeKey = getStoreDataKey();
+  if (!storeKey || storeKey === 'default_store') return;
+
+  try {
+    const res = await fetch(CLOUD_STORE_DATA_URL, {
+      headers: { 'Accept': 'application/json' }
+    });
+    let allStoresData: any = {};
+    if (res.ok) {
+      allStoresData = await res.json() || {};
+    }
+
+    allStoresData[storeKey] = {
+      ...(allStoresData[storeKey] || {}),
+      ...payload
+    };
+
+    await fetch(CLOUD_STORE_DATA_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(allStoresData)
+    });
+  } catch (e) {
+    console.warn('[CloudSync] Store data save error:', e);
+  }
+}
 
 // Helper: merge two arrays by email (no duplicates)
 function mergeByEmail<T extends { email: string }>(local: T[], cloud: T[]): T[] {

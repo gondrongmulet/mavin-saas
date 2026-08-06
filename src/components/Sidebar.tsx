@@ -97,8 +97,11 @@ export const Sidebar: React.FC<NavigationProps> = ({ activeTab, setActiveTab, on
   // Select navigation list cleanly
   const rawNavItems = currentRole === 'saas_admin' ? saasAdminNavItems : storeNavItems;
   const navItems = rawNavItems.filter(item => hasTabAccess(currentRole, item.id));
-  // Mobile Navigation items includes ALL permitted tabs for mobile users
-  const mobileNavItems = navItems;
+  // 5 Main Priority Nav Items for mobile bottom bar (clean, spacious, and large)
+  const storeMobilePriority: NavTab[] = ['dashboard', 'pos', 'recipes', 'ingredients', 'settings'];
+  const mobileNavItems = currentRole === 'saas_admin'
+    ? navItems
+    : storeNavItems.filter(item => storeMobilePriority.includes(item.id));
 
   const handleTabClick = (tabId: NavTab) => {
     setActiveTab(tabId);

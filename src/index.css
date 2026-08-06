@@ -164,21 +164,10 @@ body {
     z-index: 50;
     background: var(--bg-card);
     border-top: 1px solid var(--border-color);
-    padding: 0.4rem 1.25rem 0.4rem 0.5rem;
+    padding: 0.45rem 0.5rem;
+    justify-content: space-around;
     align-items: center;
-    overflow-x: auto;
-    white-space: nowrap;
-    gap: 0.35rem;
-    -webkit-overflow-scrolling: touch;
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
-  }
-
-  .mobile-bottom-nav::after {
-    content: '';
-    display: inline-block;
-    width: 1.5rem;
-    height: 1px;
-    flex-shrink: 0;
   }
 
   .mobile-nav-item {

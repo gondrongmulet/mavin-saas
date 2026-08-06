@@ -27,7 +27,7 @@ export interface PrintOptions {
 export async function shareReceiptText(options?: PrintOptions): Promise<boolean> {
   const plainText = formatPlainTextReceipt(options);
   
-  if (navigator.share) {
+  if (typeof navigator !== 'undefined' && 'share' in navigator && typeof navigator.share === 'function') {
     try {
       await navigator.share({
         title: `Struk Nota - ${options?.invoiceNo || 'MAVIN'}`,
@@ -52,15 +52,6 @@ export async function shareReceiptText(options?: PrintOptions): Promise<boolean>
 
 // 2. Direct Window Print (Triggers Android Native System Print Spooler directly)
 export function printReceipt(elementId: string, options?: PrintOptions): void {
-  // If navigator.share is available on mobile/APK, offer share first or fall back to system print
-  const isAndroid = /Android/i.test(navigator.userAgent) || Boolean((window as any).Capacitor);
-  
-  if (isAndroid && navigator.share) {
-    shareReceiptText(options);
-    return;
-  }
-
-  // Fallback to window.print()
   try {
     window.print();
   } catch (e) {

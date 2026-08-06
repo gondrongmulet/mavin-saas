@@ -1,6 +1,6 @@
 // ============================================================
 // MAVIN Thermal Printer Service
-// Universal receipt printing for Android APK (Bluetooth/USB) & Web Desktop
+// Direct In-Page Print Spooler & Web Bluetooth Printing for Android APK & Web
 // ============================================================
 
 export interface PrintOptions {
@@ -24,118 +24,79 @@ export interface PrintOptions {
 }
 
 export function printReceipt(elementId: string, options?: PrintOptions): void {
-  const connType = options?.connectionType || 'bluetooth';
-
-  // Option A: Share formatted text to Bluetooth Printer Driver App (if Web Share API supported and requested)
-  if (connType === 'share' && navigator.share) {
-    const plainText = formatPlainTextReceipt(options);
-    navigator.share({
-      title: `Struk Nota - ${options?.invoiceNo || 'MAVIN'}`,
-      text: plainText
-    }).catch(err => console.warn('[PrinterService] Web Share error:', err));
-    return;
-  }
-
-  // Option B: Native Android & Desktop System Print Spooler (Clean, no ERR_UNKNOWN_URL_SCHEME!)
   const el = document.getElementById(elementId);
   const contentHtml = el ? el.innerHTML : '';
   const paperPx = options?.paperWidth === '80mm' ? '320px' : '230px';
 
-  // 1. Try Window Popup Spooler (Best for Mobile WebView & Android Print Manager)
-  try {
-    const printWin = window.open('', '_blank', 'width=380,height=600');
-    if (printWin) {
-      printWin.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Struk Nota ${options?.invoiceNo || ''}</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-              @page { margin: 0; size: auto; }
-              body {
-                font-family: 'Courier New', Courier, monospace;
-                width: ${paperPx};
-                margin: 0 auto;
-                padding: 10px 6px;
-                font-size: 11px;
-                color: #000;
-                background: #fff;
-              }
-              * { box-sizing: border-box; }
-              img { max-width: 100%; height: auto; }
-              .modal-footer, button, .no-print { display: none !important; }
-            </style>
-          </head>
-          <body>
-            ${contentHtml}
-            <script>
-              window.onload = function() {
-                window.focus();
-                setTimeout(function() {
-                  window.print();
-                  setTimeout(function() { window.close(); }, 1000);
-                }, 200);
-              };
-            </script>
-          </body>
-        </html>
-      `);
-      printWin.document.close();
-      return;
-    }
-  } catch (e) {
-    console.warn('[PrinterService] Window popup error, falling back to hidden iframe:', e);
+  // Remove any previously created hidden print iframe
+  const existingIframe = document.getElementById('mavin-print-iframe');
+  if (existingIframe) {
+    existingIframe.remove();
   }
 
-  // 2. Fallback to hidden iframe print
+  // Create a hidden in-page iframe (NEVER opens external browser windows or about:blank tabs!)
   const iframe = document.createElement('iframe');
+  iframe.id = 'mavin-print-iframe';
   iframe.style.position = 'fixed';
   iframe.style.right = '0';
   iframe.style.bottom = '0';
-  iframe.style.width = '0';
-  iframe.style.height = '0';
-  iframe.style.border = '0';
+  iframe.style.width = '0px';
+  iframe.style.height = '0px';
+  iframe.style.border = '0px';
+  iframe.style.opacity = '0';
+  iframe.style.pointerEvents = 'none';
   document.body.appendChild(iframe);
 
   const doc = iframe.contentWindow?.document;
-  if (doc) {
-    doc.open();
-    doc.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Struk Nota</title>
-          <style>
-            @page { margin: 0; size: auto; }
-            body {
-              font-family: 'Courier New', Courier, monospace;
-              width: ${paperPx};
-              margin: 0 auto;
-              padding: 10px 6px;
-              font-size: 11px;
-              color: #000;
-              background: #fff;
-            }
-            * { box-sizing: border-box; }
-            img { max-width: 100%; height: auto; }
-            .modal-footer, button, .no-print { display: none !important; }
-          </style>
-        </head>
-        <body>
-          ${contentHtml}
-          <script>
-            window.onload = function() {
-              window.focus();
-              window.print();
-              setTimeout(function() { if (window.frameElement) window.frameElement.remove(); }, 1200);
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    doc.close();
+  if (!doc) {
+    window.print();
+    return;
   }
+
+  doc.open();
+  doc.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Struk Nota ${options?.invoiceNo || ''}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          @page { margin: 0; size: auto; }
+          body {
+            font-family: 'Courier New', Courier, monospace;
+            width: ${paperPx};
+            margin: 0 auto;
+            padding: 10px 6px;
+            font-size: 11px;
+            color: #000;
+            background: #fff;
+          }
+          * { box-sizing: border-box; }
+          img { max-width: 100%; height: auto; }
+          .modal-footer, button, .no-print { display: none !important; }
+        </style>
+      </head>
+      <body>
+        ${contentHtml}
+        <script>
+          window.onload = function() {
+            window.focus();
+            setTimeout(function() {
+              window.print();
+            }, 150);
+          };
+        </script>
+      </body>
+    </html>
+  `);
+  doc.close();
+
+  // Clean up iframe after printing completes
+  setTimeout(() => {
+    if (document.body.contains(iframe)) {
+      document.body.removeChild(iframe);
+    }
+  }, 3000);
 }
 
 export function formatPlainTextReceipt(options?: PrintOptions): string {

@@ -81,6 +81,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     let assignedRole: UserRole = 'owner';
+    let resolvedStoreName = '';
+    let resolvedOwnerName = '';
 
     // -------------------------------------------------------------
     // STRICT PRODUCTION AUTHENTICATION & ROLE VERIFICATION

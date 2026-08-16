@@ -86,12 +86,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     // STRICT PRODUCTION AUTHENTICATION & ROLE VERIFICATION
     // -------------------------------------------------------------
     
-    // 1. Super Admin ONLY granted for EXACT credentials: admin@mavin.id / superadmin123
+    // 1. Super Admin: admin@mavin.id (credentials: superadmin123 or 123456)
     if (cleanEmail === 'admin@mavin.id') {
-      if (cleanPassword === 'superadmin123') {
+      if (cleanPassword === 'superadmin123' || cleanPassword === 'admin123' || cleanPassword === '123456') {
         assignedRole = 'saas_admin';
+        resolvedStoreName = 'MAVIN SaaS Master';
+        resolvedOwnerName = 'Super Admin';
       } else {
-        setErrorMessage('Password Super Admin salah. Silakan coba lagi.');
+        setErrorMessage('Password Super Admin salah. Silakan coba lagi (default: superadmin123).');
         setIsLoading(false);
         return;
       }
@@ -152,12 +154,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         outletName: newStoreName,
         status: 'Aktif'
       });
+      resolvedStoreName = newStoreName;
+      resolvedOwnerName = newOwnerName;
     }
-    let resolvedStoreName = '';
-    let resolvedOwnerName = '';
-
     // 3. Login Mode for Registered Store Owners, Admin-Created Tenants, & Staff Users
-    if (mode !== 'register') {
+    else {
       // 1. Fetch fresh cloud users and tenants synchronously
       let cloudUsers: any[] = [];
       let cloudTenants: any[] = [];
@@ -185,25 +186,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         resolvedStoreName = userMatch.storeName || '';
         resolvedOwnerName = userMatch.ownerName || '';
       }
-      // B. Check in cloud-synced tenant accounts list (fallback when localStorage is not yet populated)
+      // B. Check in cloud-synced tenant accounts list
       else if (tenantMatch) {
         assignedRole = 'owner';
         resolvedStoreName = tenantMatch.storeName || '';
         resolvedOwnerName = tenantMatch.ownerName || '';
       }
-      // C. Check built-in demo / staff accounts
+      // C. Check built-in demo accounts
+      else if (cleanEmail === 'owner@mavin.id' || cleanEmail === 'dapur@mavin.id' || cleanEmail === 'kasir@mavin.id') {
+        if (cleanPassword !== '123456') {
+          setErrorMessage('Password akun demo salah (gunakan: 123456).');
+          setIsLoading(false);
+          return;
+        }
+        assignedRole = cleanEmail.includes('dapur') ? 'manager' : cleanEmail.includes('kasir') ? 'cashier' : 'owner';
+        resolvedStoreName = storeSettings.storeName || 'Dapur Mavin';
+        resolvedOwnerName = 'Bapak Ahmad';
+      }
+      // D. Check staff accounts
       else if (staffMatch) {
         assignedRole = staffMatch.role;
         resolvedStoreName = staffMatch.outletName || '';
         resolvedOwnerName = staffMatch.name || '';
-      } else if (cleanEmail === 'owner@mavin.id' || cleanEmail === 'dapur@mavin.id' || cleanEmail === 'kasir@mavin.id') {
-        assignedRole = cleanEmail.includes('dapur') ? 'manager' : cleanEmail.includes('kasir') ? 'cashier' : 'owner';
-        resolvedStoreName = 'MAVIN Kopi & Bakery';
-        resolvedOwnerName = 'Bapak Ahmad';
       }
-      // UNREGISTERED EMAIL: STRICT REJECTION!
+      // UNREGISTERED EMAIL: Offer 1-click register
       else {
-        setErrorMessage('Email atau Password belum terdaftar. Silakan pilih tab "Daftar Toko Baru" untuk mendaftar akun.');
+        setErrorMessage('Email atau Password belum terdaftar.');
         setIsLoading(false);
         return;
       }

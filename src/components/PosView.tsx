@@ -8,12 +8,14 @@ import {
   Printer,
   X,
   Send,
-  Share
+  RefreshCw,
+  AlertTriangle,
+  FileText
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import type { SaleTransaction, SaleItem } from '../types';
 import { calculateRecipeHppDetails, formatIdr } from '../utils/calculator';
-import { printReceipt, shareReceiptText } from '../utils/printerService';
+import { printReceipt } from '../utils/printerService';
 
 export const PosView: React.FC = () => {
   const { recipes, ingredients, addSaleTransaction, storeSettings } = useApp();
@@ -28,8 +30,17 @@ export const PosView: React.FC = () => {
   // Cart State: Map of recipeId -> quantity
   const [cart, setCart] = useState<{ [recipeId: string]: number }>({});
 
+  // Checkout submission protection
+  const [isSubmittingCheckout, setIsSubmittingCheckout] = useState(false);
+
   // Completed Receipt Modal State
   const [completedSale, setCompletedSale] = useState<SaleTransaction | null>(null);
+
+  // Anti-Double Print States
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [printCount, setPrintCount] = useState(0);
+  const [printFeedback, setPrintFeedback] = useState<{ type: 'info' | 'success' | 'error'; text: string } | null>(null);
+  const [showReprintConfirm, setShowReprintConfirm] = useState(false);
 
   const categories = ['All', ...Array.from(new Set(recipes.map(r => r.category)))];
 
@@ -99,12 +110,14 @@ export const PosView: React.FC = () => {
 
   const handleCheckout = (e: React.FormEvent) => {
     e.preventDefault();
-    if (cartItems.length === 0) return;
+    if (cartItems.length === 0 || isSubmittingCheckout) return;
 
     if (paymentMethod === 'Tunai' && cashPaid < cartGrandTotal) {
       alert(`Uang tunai kurang! Diperlukan ${formatIdr(cartGrandTotal)}, dibayar ${formatIdr(cashPaid)}.`);
       return;
     }
+
+    setIsSubmittingCheckout(true);
 
     const saleRecord = addSaleTransaction({
       date: new Date().toISOString().replace('T', ' ').substring(0, 16),
@@ -122,8 +135,60 @@ export const PosView: React.FC = () => {
       change: paymentMethod === 'Tunai' ? change : 0
     });
 
+    setPrintCount(0);
+    setPrintFeedback(null);
+    setShowReprintConfirm(false);
     setCompletedSale(saleRecord);
     clearCart();
+    setIsSubmittingCheckout(false);
+  };
+
+  // Safe Print Executor with Anti-Duplicate Logic
+  const executePrint = async () => {
+    if (!completedSale || isPrinting) return;
+    setIsPrinting(true);
+    setPrintFeedback({ type: 'info', text: 'Mengirim struk ke printer Bluetooth...' });
+
+    try {
+      const res = await printReceipt('printable-receipt', {
+        storeName: storeSettings.storeName,
+        items: completedSale.items,
+        subtotal: completedSale.subtotal,
+        taxAmount: completedSale.taxAmount,
+        discount: completedSale.discount,
+        grandTotal: completedSale.grandTotal,
+        cashPaid: completedSale.cashPaid,
+        change: completedSale.change,
+        paymentMethod: completedSale.paymentMethod,
+        invoiceNo: completedSale.invoiceNo,
+        date: completedSale.date,
+        paperWidth: storeSettings.printerPaperWidth,
+        footerNote: storeSettings.footerNote
+      });
+
+      if (res.success) {
+        setPrintCount(prev => prev + 1);
+        setPrintFeedback({ type: 'success', text: `✅ Struk berhasil dicetak (${printCount + 1}x)!` });
+      } else {
+        setPrintFeedback({ type: 'error', text: '⚠️ ' + (res.message || 'Gagal mencetak') });
+      }
+    } catch (err: any) {
+      setPrintFeedback({ type: 'error', text: '⚠️ Gagal mengirim: ' + (err?.message || err) });
+    } finally {
+      setTimeout(() => {
+        setIsPrinting(false);
+      }, 1200);
+    }
+  };
+
+  // Intercept print click: If already printed once, ask for confirmation to avoid duplicate prints!
+  const handlePrintClick = () => {
+    if (isPrinting) return;
+    if (printCount > 0) {
+      setShowReprintConfirm(true);
+    } else {
+      executePrint();
+    }
   };
 
   const handleSendWhatsApp = () => {
@@ -140,6 +205,13 @@ export const PosView: React.FC = () => {
 
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://api.whatsapp.com/send?text=${encodedMessage}`, '_blank');
+  };
+
+  const closeReceiptModal = () => {
+    setCompletedSale(null);
+    setPrintCount(0);
+    setPrintFeedback(null);
+    setShowReprintConfirm(false);
   };
 
   return (
@@ -181,7 +253,7 @@ export const PosView: React.FC = () => {
         </div>
 
         {/* Product Cards Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '1rem' }}>
           {filteredRecipes.map(recipe => {
             const hppDetails = calculateRecipeHppDetails(recipe, ingredients);
             const isOutOfStock = recipe.finishedStock <= 0;
@@ -195,8 +267,8 @@ export const PosView: React.FC = () => {
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  border: '1px solid var(--border-color)',
-                  opacity: isOutOfStock ? 0.7 : 1
+                  opacity: isOutOfStock ? 0.65 : 1,
+                  border: cart[recipe.id] ? '2px solid var(--primary)' : undefined
                 }}
               >
                 <div>
@@ -366,10 +438,25 @@ export const PosView: React.FC = () => {
 
               <button
                 type="submit"
+                disabled={isSubmittingCheckout}
                 className="btn btn-emerald"
-                style={{ padding: '0.75rem', fontSize: '1rem', width: '100%' }}
+                style={{
+                  padding: '0.75rem',
+                  fontSize: '1rem',
+                  width: '100%',
+                  opacity: isSubmittingCheckout ? 0.7 : 1,
+                  cursor: isSubmittingCheckout ? 'not-allowed' : 'pointer'
+                }}
               >
-                <CheckCircle size={18} /> Selesaikan Pesanan & Cetak Struk
+                {isSubmittingCheckout ? (
+                  <>
+                    <RefreshCw size={18} className="spin" /> Memproses Transaksi...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={18} /> Selesaikan Pesanan & Buka Struk
+                  </>
+                )}
               </button>
             </form>
           )}
@@ -378,16 +465,39 @@ export const PosView: React.FC = () => {
 
       {/* Printable Receipt Modal */}
       {completedSale && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '420px' }}>
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="modal-content" style={{ maxWidth: '440px', maxHeight: '92vh', overflowY: 'auto' }}>
             <div className="modal-header">
-              <h3>Nota Struk Pembayaran</h3>
-              <button onClick={() => setCompletedSale(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <FileText size={18} color="var(--primary)" /> Nota Struk Pembayaran
+              </h3>
+              <button onClick={closeReceiptModal} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>
                 <X size={18} />
               </button>
             </div>
 
-            <div className="modal-body" id="printable-receipt">
+            {/* Print Status Feedback Banner */}
+            {printFeedback && (
+              <div
+                style={{
+                  margin: '0.75rem 1rem 0',
+                  padding: '0.6rem 0.85rem',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  background: printFeedback.type === 'success' ? '#ecfdf5' : printFeedback.type === 'error' ? '#fef2f2' : '#eef2ff',
+                  border: `1px solid ${printFeedback.type === 'success' ? '#a7f3d0' : printFeedback.type === 'error' ? '#fca5a5' : '#c7d2fe'}`,
+                  color: printFeedback.type === 'success' ? '#065f46' : printFeedback.type === 'error' ? '#b91c1c' : '#3730a3'
+                }}
+              >
+                {printFeedback.text}
+              </div>
+            )}
+
+            <div className="modal-body" id="printable-receipt" style={{ padding: '1rem 1.25rem' }}>
               <div style={{ textAlign: 'center', marginBottom: '1rem', borderBottom: '1px dashed #cbd5e1', paddingBottom: '0.75rem' }}>
                 <h2 style={{ fontSize: '1.25rem', marginBottom: '0.2rem' }}>{storeSettings.storeName}</h2>
                 <p style={{ fontSize: '0.75rem', margin: 0 }}>{storeSettings.address}</p>
@@ -451,35 +561,91 @@ export const PosView: React.FC = () => {
               </div>
             </div>
 
-            <div className="modal-footer" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-              <button type="button" onClick={handleSendWhatsApp} className="btn btn-emerald" style={{ background: '#25D366', fontSize: '0.85rem', padding: '0.6rem 1rem' }}>
-                <Send size={16} /> WhatsApp Struk
+            <div className="modal-footer" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'space-between', padding: '1rem' }}>
+              <button
+                type="button"
+                onClick={closeReceiptModal}
+                className="btn btn-outline"
+                style={{ fontSize: '0.85rem', padding: '0.6rem 1rem' }}
+              >
+                ✨ Selesai / Kasir Baru
               </button>
 
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={handleSendWhatsApp}
+                  className="btn btn-emerald"
+                  style={{ background: '#25D366', fontSize: '0.85rem', padding: '0.6rem 0.9rem' }}
+                >
+                  <Send size={16} /> WA Struk
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isPrinting}
+                  onClick={handlePrintClick}
+                  className="btn btn-primary"
+                  style={{
+                    background: printCount > 0 ? '#6366f1' : '#4f46e5',
+                    fontSize: '0.85rem',
+                    padding: '0.6rem 1rem',
+                    opacity: isPrinting ? 0.75 : 1,
+                    cursor: isPrinting ? 'not-allowed' : 'pointer'
+                  }}
+                  title="Cetak langsung ke Printer Bluetooth POS tanpa aplikasi tambahan"
+                >
+                  {isPrinting ? (
+                    <>
+                      <RefreshCw size={16} className="spin" /> Mencetak...
+                    </>
+                  ) : (
+                    <>
+                      <Printer size={16} /> {printCount > 0 ? `Cetak Salinan (${printCount}x)` : 'Cetak Struk POS'}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal to Prevent Accidental Duplicate Print */}
+      {showReprintConfirm && (
+        <div className="modal-overlay" style={{ zIndex: 1200 }}>
+          <div className="modal-content" style={{ maxWidth: '380px', textAlign: 'center', padding: '1.5rem' }}>
+            <div style={{ background: '#fffbeb', width: '54px', height: '54px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', border: '1px solid #fde68a' }}>
+              <AlertTriangle size={28} color="#d97706" />
+            </div>
+
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '0.5rem' }}>
+              Konfirmasi Cetak Ulang
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.4', marginBottom: '1.25rem' }}>
+              Struk invoice <strong>{completedSale?.invoiceNo}</strong> sudah pernah dicetak sebanyak <strong>{printCount} kali</strong>.
+              <br />Apakah Anda yakin ingin mencetak salinan struk lagi?
+            </p>
+
+            <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setShowReprintConfirm(false)}
+                className="btn btn-outline"
+                style={{ flex: 1, padding: '0.6rem' }}
+              >
+                Batal
+              </button>
               <button
                 type="button"
                 onClick={() => {
-                  printReceipt('printable-receipt', {
-                    storeName: storeSettings.storeName,
-                    items: completedSale.items,
-                    subtotal: completedSale.subtotal,
-                    taxAmount: completedSale.taxAmount,
-                    discount: completedSale.discount,
-                    grandTotal: completedSale.grandTotal,
-                    cashPaid: completedSale.cashPaid,
-                    change: completedSale.change,
-                    paymentMethod: completedSale.paymentMethod,
-                    invoiceNo: completedSale.invoiceNo,
-                    date: completedSale.date,
-                    paperWidth: storeSettings.printerPaperWidth,
-                    footerNote: storeSettings.footerNote
-                  });
+                  setShowReprintConfirm(false);
+                  executePrint();
                 }}
                 className="btn btn-primary"
-                style={{ background: '#4f46e5', fontSize: '0.85rem', padding: '0.6rem 1rem' }}
-                title="Cetak langsung ke Printer Bluetooth POS tanpa aplikasi tambahan"
+                style={{ flex: 1, padding: '0.6rem', background: '#4f46e5' }}
               >
-                <Printer size={16} /> Cetak Struk (Bluetooth Direct)
+                <Printer size={16} /> Ya, Cetak Lagi
               </button>
             </div>
           </div>

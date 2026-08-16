@@ -38,8 +38,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { UserRole, StaffUser } from '../types';
-import { formatIdr, formatNumber } from '../utils/calculator';
-import { printReceipt } from '../utils/printerService';
+import { printReceipt, getNativePairedPrinters, isNativeBluetoothPrinterAvailable } from '../utils/printerService';
 import type { NavTab } from './Sidebar';
 
 interface SettingsViewProps {
@@ -562,12 +561,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
                   className="form-control"
                   style={{ fontWeight: 700 }}
                 >
-                  <option value="bluetooth">📱 Bluetooth Thermal Printer (Standard 58mm/80mm Mobile POS)</option>
+                  <option value="bluetooth">📱 Bluetooth Thermal Printer (Direct ESC/POS POS-58/POS-80)</option>
                   <option value="usb">🔌 USB Direct Thermal Printer (Desktop / Tablet Cable)</option>
-                  <option value="web_dialog">🌐 Browser System Dialog Print (Pengaturan Printer Bawaan HP/OS)</option>
+                  <option value="web_dialog">🌐 Browser System Dialog Print (Layanan Cetak Sistem HP)</option>
                 </select>
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  💡 Bluetooth disarankan untuk Android HP / Tablet POS UMKM.
+                  💡 Mode Bluetooth Direct mencetak langsung ke printer fisik tanpa aplikasi perantara.
                 </span>
               </div>
 
@@ -583,6 +582,78 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ setActiveTab }) => {
                   <option value="80mm">📜 80mm (Ukuran Kertas Struk Standar Kasir POS Besar - 48 Karakter)</option>
                 </select>
               </div>
+            </div>
+
+            {/* Paired Bluetooth Printer Device Selector */}
+            <div style={{
+              background: 'var(--bg-app)',
+              padding: '1rem',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--border-color)',
+              marginTop: '0.5rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  📱 Printer Bluetooth Terpasang (Paired Devices)
+                </span>
+                <span style={{
+                  fontSize: '0.72rem',
+                  padding: '0.2rem 0.5rem',
+                  borderRadius: '12px',
+                  background: isNativeBluetoothPrinterAvailable() ? '#ecfdf5' : '#eff6ff',
+                  color: isNativeBluetoothPrinterAvailable() ? '#047857' : '#1d4ed8',
+                  fontWeight: 700
+                }}>
+                  {isNativeBluetoothPrinterAvailable() ? '🟢 Native Android Bridge Aktif' : '🌐 Web Bluetooth / Browser Mode'}
+                </span>
+              </div>
+
+              {isNativeBluetoothPrinterAvailable() ? (
+                <div>
+                  {getNativePairedPrinters().length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
+                      {getNativePairedPrinters().map((dev, idx) => {
+                        const isSelected = (localStorage.getItem('mavin_selected_printer_mac') || '') === dev.address;
+                        return (
+                          <div
+                            key={idx}
+                            onClick={() => {
+                              localStorage.setItem('mavin_selected_printer_mac', dev.address);
+                              alert(`✅ Printer "${dev.name}" dipilih sebagai printer default!`);
+                            }}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '0.6rem 0.8rem',
+                              borderRadius: '6px',
+                              border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                              background: isSelected ? 'var(--primary-light)' : 'var(--bg-card)',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{dev.name}</div>
+                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>MAC: {dev.address}</div>
+                            </div>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: isSelected ? 'var(--primary)' : 'var(--text-muted)' }}>
+                              {isSelected ? '✓ Terpilih' : 'Pilih'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '0.5rem 0' }}>
+                      Belum ada printer Bluetooth yang terpasang di HP. Silakan pasangkan (pair) printer Anda di menu <b>Pengaturan HP &gt; Bluetooth</b> terlebih dahulu.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '0.25rem 0' }}>
+                  Aplikasi akan otomatis mendeteksi printer Bluetooth yang terpasang di HP Anda saat mencetak nota di Kasir POS.
+                </p>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>

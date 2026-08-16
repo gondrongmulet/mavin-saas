@@ -1,6 +1,6 @@
 // ============================================================
 // MAVIN Thermal Printer Service
-// Triple-Action Thermal Printer Hardware Engine for Android APK
+// Native Android Bluetooth SPP Driver & Universal Fallback
 // ============================================================
 
 export interface PrintOptions {
@@ -23,65 +23,135 @@ export interface PrintOptions {
   footerNote?: string;
 }
 
-export function printReceipt(elementId: string, options?: PrintOptions): void {
-  const plainText = formatPlainTextReceipt(options);
-  if (!plainText) {
-    alert('⚠️ Data nota struk tidak valid.');
-    return;
-  }
-
-  const base64Text = btoa(unescape(encodeURIComponent(plainText)));
-
-  // CHANNEL 1: Send directly to Bluetooth Thermal Printer Socket (RawBT Local Server 127.0.0.1:40213)
-  fetch('http://127.0.0.1:40213/print', {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
-    body: plainText
-  }).catch(() => {});
-
-  // CHANNEL 2: Launch Android Thermal Printer Intent (intent:base64,...)
-  try {
-    const intentUrl = 'intent:base64,' + base64Text + '#Intent;scheme=rawbt;package=ru.a404m.rawbt;end;';
-    const a = document.createElement('a');
-    a.href = intentUrl;
-    a.target = '_system';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      if (document.body.contains(a)) document.body.removeChild(a);
-    }, 500);
-  } catch (e) {}
-
-  // CHANNEL 3: Trigger Layanan Cetak Android (window.print)
-  try {
-    window.print();
-  } catch (e) {}
+export interface PairedPrinterDevice {
+  name: string;
+  address: string;
 }
 
-export async function shareReceiptText(options?: PrintOptions): Promise<boolean> {
-  const plainText = formatPlainTextReceipt(options);
-  if (typeof navigator !== 'undefined' && 'share' in navigator && typeof navigator.share === 'function') {
+// Check if Native Android Bluetooth Bridge is present in APK
+export function isNativeBluetoothPrinterAvailable(): boolean {
+  const nativePrinter = (window as any).AndroidBluetoothPrinter;
+  return Boolean(nativePrinter && typeof nativePrinter.printReceipt === 'function');
+}
+
+// Get list of paired Bluetooth devices on Android phone
+export function getNativePairedPrinters(): PairedPrinterDevice[] {
+  const nativePrinter = (window as any).AndroidBluetoothPrinter;
+  if (nativePrinter && typeof nativePrinter.getPairedDevices === 'function') {
     try {
-      await navigator.share({
-        title: `Struk Nota - ${options?.invoiceNo || 'MAVIN'}`,
-        text: plainText
-      });
-      return true;
+      const jsonStr = nativePrinter.getPairedDevices();
+      return JSON.parse(jsonStr || '[]');
     } catch (e) {
-      console.warn('[PrinterService] Web Share error:', e);
+      console.warn('[PrinterService] Error parsing paired devices:', e);
+      return [];
+    }
+  }
+  return [];
+}
+
+// Primary Print Function
+export async function printReceipt(elementId: string, options?: PrintOptions): Promise<{ success: boolean; message: string }> {
+  const plainText = formatPlainTextReceipt(options);
+  if (!plainText) {
+    return { success: false, message: 'Data struk nota tidak valid.' };
+  }
+
+  // 1. Native Android Bluetooth Bridge (Primary for APK - ZERO third party apps!)
+  const nativePrinter = (window as any).AndroidBluetoothPrinter;
+  if (nativePrinter && typeof nativePrinter.printReceipt === 'function') {
+    try {
+      const selectedMac = localStorage.getItem('mavin_selected_printer_mac') || '';
+      const result: string = nativePrinter.printReceipt(plainText, selectedMac);
+      if (result && result.startsWith('SUCCESS')) {
+        return { success: true, message: result };
+      } else {
+        alert(result || '⚠️ Gagal mencetak ke printer Bluetooth.');
+        return { success: false, message: result };
+      }
+    } catch (e: any) {
+      alert('⚠️ Gagal mengirim data ke Bluetooth Printer: ' + (e?.message || e));
+      return { success: false, message: String(e) };
     }
   }
 
-  try {
-    await navigator.clipboard.writeText(plainText);
-    alert('📋 Teks Struk Nota berhasil disalin!');
-    return true;
-  } catch (e) {
-    console.warn('[PrinterService] Clipboard copy error:', e);
+  // 2. Web Bluetooth Direct (For Chrome Browser on Android / Desktop)
+  const nav = navigator as any;
+  if (typeof navigator !== 'undefined' && nav.bluetooth) {
+    const ok = await printDirectBluetoothESC(options);
+    if (ok) return { success: true, message: 'Berhasil mencetak via Web Bluetooth' };
   }
-  return false;
+
+  // 3. Fallback: window.print() (For Web Desktop)
+  try {
+    window.print();
+    return { success: true, message: 'Membuka dialog cetak sistem' };
+  } catch (e) {
+    return { success: false, message: 'Gagal mencetak' };
+  }
 }
 
+// Web Bluetooth ESC/POS Direct (Chrome Web Browser)
+export async function printDirectBluetoothESC(options?: PrintOptions): Promise<boolean> {
+  const nav = navigator as any;
+  if (!nav || !nav.bluetooth) return false;
+
+  try {
+    const device = await nav.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: [
+        '000018f0-0000-1000-8000-00005f9b34fb',
+        '00001101-0000-1000-8000-00005f9b34fb',
+        'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+        '0000ff00-0000-1000-8000-00005f9b34fb',
+        '49535343-fe7d-4ae5-8fa9-9fafd205e455'
+      ]
+    });
+
+    if (!device) return false;
+
+    const server = await device.gatt.connect();
+    const services = await server.getPrimaryServices();
+    let targetChar: any = null;
+
+    for (const service of services) {
+      const chars = await service.getCharacteristics();
+      for (const c of chars) {
+        if (c.properties.write || c.properties.writeWithoutResponse) {
+          targetChar = c;
+          break;
+        }
+      }
+      if (targetChar) break;
+    }
+
+    if (!targetChar) {
+      await device.gatt.disconnect();
+      return false;
+    }
+
+    const text = formatPlainTextReceipt(options);
+    const encoder = new TextEncoder();
+    const initCmd = new Uint8Array([0x1b, 0x40]);
+    const feedCutCmd = new Uint8Array([0x0a, 0x0a, 0x0a, 0x1d, 0x56, 0x41, 0x03]);
+
+    await targetChar.writeValue(initCmd);
+    const textBytes = encoder.encode(text);
+
+    for (let i = 0; i < textBytes.length; i += 100) {
+      const chunk = textBytes.slice(i, i + 100);
+      await targetChar.writeValue(chunk);
+    }
+    await targetChar.writeValue(feedCutCmd);
+
+    await device.gatt.disconnect();
+    return true;
+  } catch (e: any) {
+    console.warn('[PrinterService] Web Bluetooth print error:', e);
+    return false;
+  }
+}
+
+// Format Plain Text Struk Receipt
 export function formatPlainTextReceipt(options?: PrintOptions): string {
   if (!options) return '';
   const width = options.paperWidth === '80mm' ? 48 : 32;

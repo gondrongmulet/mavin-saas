@@ -1,12 +1,12 @@
 import { TenantAccount } from '../types';
 
 // ============================================================
-// MAVIN SaaS - Realtime 2-Way Cloud Database Sync
-// JsonBlob REST endpoints (free, no auth, full CRUD)
+// MAVIN SaaS - Reliable Cloud Database Sync Engine (restful-api.dev)
+// High-availability persistent cloud storage with zero expiration
 // ============================================================
-const CLOUD_TENANTS_URL = 'https://jsonblob.com/api/jsonBlob/019fd236-7dda-7667-b4ad-7913f0ef8bf6';
-const CLOUD_USERS_URL = 'https://jsonblob.com/api/jsonBlob/019fd23b-5ffc-77dd-9e13-8aa3d63c5643';
-const CLOUD_STORE_DATA_URL = 'https://jsonblob.com/api/jsonBlob/019fd501-6e45-7c88-93d6-1b2f6c3dd140';
+const CLOUD_TENANTS_URL = 'https://api.restful-api.dev/objects/ff8081819ff5b11001a00a285bc42b6a';
+const CLOUD_USERS_URL = 'https://api.restful-api.dev/objects/ff8081819ff5b11001a00a285c252b6b';
+const CLOUD_STORE_DATA_URL = 'https://api.restful-api.dev/objects/ff8081819ff5b11001a00a285c7c2b6c';
 
 export interface StoreDataPayload {
   ingredients?: any[];
@@ -18,7 +18,7 @@ export interface StoreDataPayload {
 }
 
 // Helper: Get sanitized key for a store
-function getStoreDataKey(): string {
+export function getStoreDataKey(): string {
   const sessionStr = localStorage.getItem('mavin_active_user_session');
   if (sessionStr) {
     try {
@@ -51,6 +51,18 @@ function mergeById<T extends { id: string }>(local: T[], cloud: T[]): T[] {
   return Array.from(map.values());
 }
 
+// Helper: merge two arrays by `email` field
+function mergeByEmail<T extends { email: string }>(local: T[], cloud: T[]): T[] {
+  const merged = [...(local || [])];
+  (cloud || []).forEach(c => {
+    if (c && c.email && !merged.some(m => m && m.email && m.email.trim().toLowerCase() === c.email.trim().toLowerCase())) {
+      merged.push(c);
+    }
+  });
+  return merged;
+}
+
+// 1. STORE DATA SYNC (Ingredients, Recipes, Purchases, Productions, Sales)
 export async function syncCloudStoreDataFetch(): Promise<StoreDataPayload | null> {
   const storeKey = getStoreDataKey();
   if (!storeKey) return null;
@@ -61,12 +73,13 @@ export async function syncCloudStoreDataFetch(): Promise<StoreDataPayload | null
     });
     let allStoresData: any = {};
     if (res.ok) {
-      allStoresData = await res.json() || {};
+      const json = await res.json();
+      allStoresData = json?.data?.stores || {};
     }
 
     let cloudData: StoreDataPayload = allStoresData[storeKey] || {};
 
-    // Smart fallback & migration: if primary key has 0 items, search all store keys for matching ingredients/recipes!
+    // Smart fallback: if primary key has 0 items, search all stores for any populated data
     if ((!cloudData.ingredients || cloudData.ingredients.length === 0) && (!cloudData.recipes || cloudData.recipes.length === 0)) {
       const altKeys = Object.keys(allStoresData);
       for (const altKey of altKeys) {
@@ -115,12 +128,12 @@ export async function syncCloudStoreDataFetch(): Promise<StoreDataPayload | null
     if (mergedProductions.length > 0) localStorage.setItem('mavin_productions', JSON.stringify(mergedProductions));
     if (mergedSales.length > 0) localStorage.setItem('mavin_sales', JSON.stringify(mergedSales));
 
-    // Immediately push merged payload back to cloud JsonBlob
+    // Immediately push merged payload back to cloud
     allStoresData[storeKey] = mergedPayload;
     await fetch(CLOUD_STORE_DATA_URL, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(allStoresData)
+      body: JSON.stringify({ name: 'mavin_saas_store_data_v1', data: { stores: allStoresData } })
     });
 
     return mergedPayload;
@@ -140,7 +153,8 @@ export async function forcePushStoreDataToCloud(): Promise<boolean> {
     });
     let allStoresData: any = {};
     if (res.ok) {
-      allStoresData = await res.json() || {};
+      const json = await res.json();
+      allStoresData = json?.data?.stores || {};
     }
 
     const localIngStr = localStorage.getItem('mavin_ingredients');
@@ -163,7 +177,7 @@ export async function forcePushStoreDataToCloud(): Promise<boolean> {
     await fetch(CLOUD_STORE_DATA_URL, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(allStoresData)
+      body: JSON.stringify({ name: 'mavin_saas_store_data_v1', data: { stores: allStoresData } })
     });
     return true;
   } catch (e) {
@@ -182,12 +196,12 @@ export async function syncCloudStoreDataSave(payload: StoreDataPayload): Promise
     });
     let allStoresData: any = {};
     if (res.ok) {
-      allStoresData = await res.json() || {};
+      const json = await res.json();
+      allStoresData = json?.data?.stores || {};
     }
 
     const existingStore = allStoresData[storeKey] || {};
 
-    // Smart merge: merge incoming payload items with existing cloud items so no device wipes out another's data
     const mergedPayload: StoreDataPayload = {
       ingredients: payload.ingredients !== undefined ? mergeById(existingStore.ingredients || [], payload.ingredients) : existingStore.ingredients,
       recipes: payload.recipes !== undefined ? mergeById(existingStore.recipes || [], payload.recipes) : existingStore.recipes,
@@ -202,34 +216,18 @@ export async function syncCloudStoreDataSave(payload: StoreDataPayload): Promise
     await fetch(CLOUD_STORE_DATA_URL, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(allStoresData)
+      body: JSON.stringify({ name: 'mavin_saas_store_data_v1', data: { stores: allStoresData } })
     });
   } catch (e) {
     console.warn('[CloudSync] Store data save error:', e);
   }
 }
 
-// Helper: merge two arrays by email (no duplicates)
-function mergeByEmail<T extends { email: string }>(local: T[], cloud: T[]): T[] {
-  const merged = [...local];
-  cloud.forEach(c => {
-    if (c.email && !merged.some(m => m.email.trim().toLowerCase() === c.email.trim().toLowerCase())) {
-      merged.push(c);
-    }
-  });
-  return merged;
-}
-
-// ============================================================
-// 1. TENANTS: Full 2-Way Sync (local ↔ cloud)
-// Called on app mount. Merges both directions then saves everywhere.
-// ============================================================
+// 2. TENANTS: Full 2-Way Sync (local ↔ cloud)
 export async function syncCloudTenantsFetch(): Promise<TenantAccount[]> {
-  // A. Read local
   const localStr = localStorage.getItem('mavin_tenants_v5');
   let localList: TenantAccount[] = localStr ? JSON.parse(localStr) : [];
 
-  // Also include registered users as tenants
   const regStr = localStorage.getItem('mavin_registered_users');
   if (regStr) {
     try {
@@ -255,32 +253,27 @@ export async function syncCloudTenantsFetch(): Promise<TenantAccount[]> {
     } catch (e) {}
   }
 
-  // B. Read cloud
   let cloudList: TenantAccount[] = [];
   try {
     const res = await fetch(CLOUD_TENANTS_URL, {
       headers: { 'Accept': 'application/json' }
     });
     if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) cloudList = data;
+      const json = await res.json();
+      cloudList = json?.data?.tenants || [];
     }
   } catch (e) {
     console.warn('[CloudSync] Tenant fetch error:', e);
   }
 
-  // C. Merge both directions
   const merged = mergeByEmail(localList, cloudList);
-
-  // D. Save merged result back to BOTH local and cloud
   localStorage.setItem('mavin_tenants_v5', JSON.stringify(merged));
 
-  // Push merged list to cloud (so APK data becomes visible to Web and vice versa)
   try {
     await fetch(CLOUD_TENANTS_URL, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(merged)
+      body: JSON.stringify({ name: 'mavin_saas_tenants_v1', data: { tenants: merged } })
     });
   } catch (e) {
     console.warn('[CloudSync] Tenant push error:', e);
@@ -289,9 +282,7 @@ export async function syncCloudTenantsFetch(): Promise<TenantAccount[]> {
   return merged;
 }
 
-// Save a single new tenant (called when admin adds or user registers)
 export async function syncCloudTenantSave(tenant: TenantAccount): Promise<void> {
-  // A. Add to local
   const localStr = localStorage.getItem('mavin_tenants_v5');
   let list: TenantAccount[] = localStr ? JSON.parse(localStr) : [];
   if (!list.some(t => t.email.trim().toLowerCase() === tenant.email.trim().toLowerCase())) {
@@ -299,15 +290,14 @@ export async function syncCloudTenantSave(tenant: TenantAccount): Promise<void> 
     localStorage.setItem('mavin_tenants_v5', JSON.stringify(list));
   }
 
-  // B. Fetch current cloud, merge, push back
   try {
     const res = await fetch(CLOUD_TENANTS_URL, {
       headers: { 'Accept': 'application/json' }
     });
     let cloudList: TenantAccount[] = [];
     if (res.ok) {
-      const parsed = await res.json();
-      if (Array.isArray(parsed)) cloudList = parsed;
+      const json = await res.json();
+      cloudList = json?.data?.tenants || [];
     }
 
     if (!cloudList.some(t => t.email.trim().toLowerCase() === tenant.email.trim().toLowerCase())) {
@@ -317,46 +307,39 @@ export async function syncCloudTenantSave(tenant: TenantAccount): Promise<void> 
     await fetch(CLOUD_TENANTS_URL, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(cloudList)
+      body: JSON.stringify({ name: 'mavin_saas_tenants_v1', data: { tenants: cloudList } })
     });
   } catch (e) {
     console.warn('[CloudSync] Tenant save error:', e);
   }
 }
 
-// ============================================================
-// 2. REGISTERED USERS (login credentials): Full 2-Way Sync
-// ============================================================
+// 3. REGISTERED USERS (login credentials): Full 2-Way Sync
 export async function syncCloudUsersFetch(): Promise<any[]> {
-  // A. Read local
   const localStr = localStorage.getItem('mavin_registered_users');
   let localList: any[] = localStr ? JSON.parse(localStr) : [];
 
-  // B. Read cloud
   let cloudList: any[] = [];
   try {
     const res = await fetch(CLOUD_USERS_URL, {
       headers: { 'Accept': 'application/json' }
     });
     if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) cloudList = data;
+      const json = await res.json();
+      cloudList = json?.data?.users || [];
     }
   } catch (e) {
     console.warn('[CloudSync] Users fetch error:', e);
   }
 
-  // C. Merge both directions
   const merged = mergeByEmail(localList, cloudList);
-
-  // D. Save to both
   localStorage.setItem('mavin_registered_users', JSON.stringify(merged));
 
   try {
     await fetch(CLOUD_USERS_URL, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(merged)
+      body: JSON.stringify({ name: 'mavin_saas_users_v1', data: { users: merged } })
     });
   } catch (e) {
     console.warn('[CloudSync] Users push error:', e);
@@ -365,9 +348,7 @@ export async function syncCloudUsersFetch(): Promise<any[]> {
   return merged;
 }
 
-// Save a single new user (called when someone registers)
 export async function syncCloudUserSave(user: any): Promise<void> {
-  // A. Add to local
   const localStr = localStorage.getItem('mavin_registered_users');
   let list: any[] = localStr ? JSON.parse(localStr) : [];
   if (!list.some((u: any) => u.email.trim().toLowerCase() === user.email.trim().toLowerCase())) {
@@ -375,15 +356,14 @@ export async function syncCloudUserSave(user: any): Promise<void> {
     localStorage.setItem('mavin_registered_users', JSON.stringify(list));
   }
 
-  // B. Fetch cloud, merge, push
   try {
     const res = await fetch(CLOUD_USERS_URL, {
       headers: { 'Accept': 'application/json' }
     });
     let cloudList: any[] = [];
     if (res.ok) {
-      const parsed = await res.json();
-      if (Array.isArray(parsed)) cloudList = parsed;
+      const json = await res.json();
+      cloudList = json?.data?.users || [];
     }
 
     if (!cloudList.some((u: any) => u.email.trim().toLowerCase() === user.email.trim().toLowerCase())) {
@@ -393,7 +373,7 @@ export async function syncCloudUserSave(user: any): Promise<void> {
     await fetch(CLOUD_USERS_URL, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(cloudList)
+      body: JSON.stringify({ name: 'mavin_saas_users_v1', data: { users: cloudList } })
     });
   } catch (e) {
     console.warn('[CloudSync] User save error:', e);

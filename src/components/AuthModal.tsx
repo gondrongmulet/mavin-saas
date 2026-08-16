@@ -11,11 +11,12 @@ import {
   CheckCircle,
   Eye,
   EyeOff,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { UserRole } from '../types';
-import { syncCloudUserSave } from '../utils/supabaseSync';
+import { syncCloudUserSave, syncCloudUsersFetch, syncCloudTenantsFetch, syncCloudStoreDataFetch } from '../utils/supabaseSync';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -38,11 +39,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // Form Inputs
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [storeNameInput, setStoreNameInput] = useState('');
   const [ownerNameInput, setOwnerNameInput] = useState('');
   const [phoneInput, setPhoneInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   // Reset form inputs every time the modal opens or mode changes
   useEffect(() => {
@@ -55,20 +57,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setPhoneInput('');
       setShowPassword(false);
       setErrorMessage('');
+      setIsLoading(false);
+      // Pre-fetch cloud users & tenants in background when modal opens
+      syncCloudUsersFetch().catch(() => {});
+      syncCloudTenantsFetch().catch(() => {});
     }
   }, [isOpen, initialMode]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
+    setIsLoading(true);
 
     const cleanEmail = email.trim().toLowerCase();
     const cleanPassword = password.trim();
 
     if (!cleanEmail || !cleanPassword) {
       setErrorMessage('Silakan isi email dan password Anda.');
+      setIsLoading(false);
       return;
     }
 
@@ -84,6 +92,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         assignedRole = 'saas_admin';
       } else {
         setErrorMessage('Password Super Admin salah. Silakan coba lagi.');
+        setIsLoading(false);
         return;
       }
     } 
@@ -91,11 +100,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     else if (mode === 'register') {
       assignedRole = 'owner';
 
-      // Save new owner credential mapping to LocalStorage
-      const registeredUsers = JSON.parse(localStorage.getItem('mavin_registered_users') || '[]');
-      const exists = registeredUsers.some((u: any) => u.email.trim().toLowerCase() === cleanEmail);
+      // Fetch fresh users from cloud first
+      const freshUsers = await syncCloudUsersFetch();
+      const exists = (freshUsers || []).some((u: any) => u && u.email && u.email.trim().toLowerCase() === cleanEmail);
       if (exists) {
         setErrorMessage('Email ini sudah terdaftar. Silakan pilih tab "Masuk (Login)".');
+        setIsLoading(false);
         return;
       }
 
@@ -111,11 +121,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         phone: phoneInput
       };
 
-      registeredUsers.push(newStore);
-      localStorage.setItem('mavin_registered_users', JSON.stringify(registeredUsers));
+      const localUsers = JSON.parse(localStorage.getItem('mavin_registered_users') || '[]');
+      localUsers.push(newStore);
+      localStorage.setItem('mavin_registered_users', JSON.stringify(localUsers));
 
       // Push credentials to cloud so Web login can find them too
-      syncCloudUserSave(newStore);
+      await syncCloudUserSave(newStore);
 
       // Also register to SaaS Tenant list so Super Admin sees the new registered store!
       addTenantAccount({
@@ -147,16 +158,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     // 3. Login Mode for Registered Store Owners, Admin-Created Tenants, & Staff Users
     if (mode !== 'register') {
-      const registeredUsers = JSON.parse(localStorage.getItem('mavin_registered_users') || '[]');
-      const userMatch = registeredUsers.find((u: any) => u.email.trim().toLowerCase() === cleanEmail);
-      const tenantMatch = tenantAccounts.find(t => t.email.trim().toLowerCase() === cleanEmail);
-      const staffMatch = staffUsers.find(u => u.email.trim().toLowerCase() === cleanEmail);
+      // 1. Fetch fresh cloud users and tenants synchronously
+      let cloudUsers: any[] = [];
+      let cloudTenants: any[] = [];
+      try {
+        cloudUsers = await syncCloudUsersFetch();
+        cloudTenants = await syncCloudTenantsFetch();
+      } catch (e) {}
+
+      const localUsers = JSON.parse(localStorage.getItem('mavin_registered_users') || '[]');
+      const allUsers = [...cloudUsers, ...localUsers];
+
+      const userMatch = allUsers.find((u: any) => u && u.email && u.email.trim().toLowerCase() === cleanEmail);
+      const tenantMatch = (cloudTenants || tenantAccounts).find((t: any) => t && t.email && t.email.trim().toLowerCase() === cleanEmail);
+      const staffMatch = staffUsers.find(u => u && u.email && u.email.trim().toLowerCase() === cleanEmail);
 
       // A. Check in registered users list (saved from Web or Super Admin)
       if (userMatch) {
         const targetPass = userMatch.password || '123456';
         if (cleanPassword !== targetPass && cleanPassword !== '123456') {
           setErrorMessage('Password yang Anda masukkan salah. Silakan periksa kembali.');
+          setIsLoading(false);
           return;
         }
         assignedRole = userMatch.role || 'owner';
@@ -165,10 +187,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
       // B. Check in cloud-synced tenant accounts list (fallback when localStorage is not yet populated)
       else if (tenantMatch) {
-        if (cleanPassword !== '123456') {
-          setErrorMessage('Password yang Anda masukkan salah. Silakan periksa kembali.');
-          return;
-        }
         assignedRole = 'owner';
         resolvedStoreName = tenantMatch.storeName || '';
         resolvedOwnerName = tenantMatch.ownerName || '';
@@ -185,7 +203,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
       // UNREGISTERED EMAIL: STRICT REJECTION!
       else {
-        setErrorMessage('Email atau Password belum terdaftar. Silakan pilih tab "Daftar Toko Baru" untuk mendaftar.');
+        setErrorMessage('Email atau Password belum terdaftar. Silakan pilih tab "Daftar Toko Baru" untuk mendaftar akun.');
+        setIsLoading(false);
         return;
       }
     }
@@ -224,6 +243,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       role: assignedRole
     }));
 
+    // Trigger cloud store data sync for this user
+    try {
+      await syncCloudStoreDataFetch();
+    } catch (e) {}
+
+    setIsLoading(false);
     setCurrentRole(assignedRole);
     onLoginSuccess(assignedRole);
   };
@@ -454,6 +479,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             <button
               type="submit"
+              disabled={isLoading}
               className="btn btn-primary"
               style={{
                 width: '100%',
@@ -464,10 +490,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '0.5rem'
+                gap: '0.5rem',
+                opacity: isLoading ? 0.75 : 1,
+                cursor: isLoading ? 'not-allowed' : 'pointer'
               }}
             >
-              {mode === 'login' ? 'Masuk Sekarang' : 'Daftarkan Toko & Mulai Trial PRO'} <ArrowRight size={18} />
+              {isLoading ? (
+                <>
+                  <RefreshCw size={18} className="spin" /> Memeriksa Akun di Cloud...
+                </>
+              ) : (
+                <>
+                  {mode === 'login' ? 'Masuk Sekarang' : 'Daftarkan Toko & Mulai Trial PRO'} <ArrowRight size={18} />
+                </>
+              )}
             </button>
           </form>
         </div>

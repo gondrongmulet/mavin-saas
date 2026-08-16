@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { UserRole, StaffUser } from '../types';
+import { formatIdr, formatNumber } from '../utils/calculator';
 import { printReceipt, getNativePairedPrinters, isNativeBluetoothPrinterAvailable } from '../utils/printerService';
 import type { NavTab } from './Sidebar';
 

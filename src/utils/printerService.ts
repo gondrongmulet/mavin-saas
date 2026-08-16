@@ -222,3 +222,28 @@ function leftRight(left: string, right: string, width: number): string {
 function formatRp(val: number): string {
   return 'Rp ' + Math.round(val).toLocaleString('id-ID');
 }
+
+// Share receipt text helper (Web Share API)
+export async function shareReceiptText(options?: PrintOptions): Promise<boolean> {
+  const plainText = formatPlainTextReceipt(options);
+  if (typeof navigator !== 'undefined' && 'share' in navigator && typeof navigator.share === 'function') {
+    try {
+      await navigator.share({
+        title: `Struk Nota - ${options?.invoiceNo || 'MAVIN'}`,
+        text: plainText
+      });
+      return true;
+    } catch (e) {
+      console.warn('[PrinterService] Web Share error:', e);
+    }
+  }
+
+  try {
+    await navigator.clipboard.writeText(plainText);
+    alert('📋 Teks Struk Nota berhasil disalin ke clipboard!');
+    return true;
+  } catch (e) {
+    alert('⚠️ Gagal menyalin teks struk.');
+  }
+  return false;
+}

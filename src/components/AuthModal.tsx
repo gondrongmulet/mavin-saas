@@ -371,8 +371,35 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* Body Form */}
         <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', flex: 1 }}>
           {errorMessage && (
-            <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-sm)', color: '#b91c1c', fontSize: '0.8rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <AlertCircle size={16} /> {errorMessage}
+            <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: '0.75rem 0.85rem', borderRadius: 'var(--radius-sm)', color: '#b91c1c', fontSize: '0.8rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}>
+                <AlertCircle size={16} /> {errorMessage}
+              </div>
+              {mode === 'login' && errorMessage.includes('belum terdaftar') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('register');
+                    setErrorMessage('');
+                  }}
+                  style={{
+                    marginTop: '0.5rem',
+                    background: '#4f46e5',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '0.4rem 0.75rem',
+                    borderRadius: '4px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.3rem'
+                  }}
+                >
+                  ✨ Daftarkan Akun Ini Sekarang (1 Klik Langsung Aktif)
+                </button>
+              )}
             </div>
           )}
 

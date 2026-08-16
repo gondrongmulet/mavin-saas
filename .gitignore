@@ -24,3 +24,8 @@ yarn-debug.log*
 yarn-error.log*
 .DS_Store
 Thumbs.db
+
+# Android APK binaries
+*.apk
+public/*.apk
+android/app/build/outputs/apk/
